@@ -1,0 +1,394 @@
+import csv
+import html
+import json
+import re
+import unicodedata
+from pathlib import Path
+
+import ftfy
+import requests
+
+
+SERPAPI_URL = 'https://serpapi.com/search.json'
+CROSSREF_URL = 'https://api.crossref.org/works'
+PAGE_SIZE = 100
+CROSSREF_ROWS = 5
+PREPRINT_PLATFORM_NAMES = {'biorxiv', 'medrxiv', 'chemrxiv', 'arxiv'}
+PREPRINT_PUBLICATION_TYPES = {'posted-content', 'preprint'}
+PREPRINT_SUBTYPES = {'preprint'}
+CSV_COLUMNS = [
+	'paper_id',
+	'title',
+	'year',
+	'venue_raw',
+	'citations',
+	'paper_url',
+	'journal_sjr',
+	'is_first_author',
+	'is_preprint',
+]
+
+
+def fetch_author_page(api_key, author_id, start):
+	'Fetch one author page from SerpApi.'
+	params = {
+		'engine': 'google_scholar_author',
+		'author_id': author_id,
+		'api_key': api_key,
+		'num': PAGE_SIZE,
+		'start': start,
+	}
+	response = requests.get(SERPAPI_URL, params=params, timeout=60)
+	response.raise_for_status()
+	return response.json()
+
+
+def fetch_crossref_hits(title, author_name):
+	'Fetch Crossref candidate records for one paper.'
+	params = {
+		'query.title': title,
+		'query.author': author_name,
+		'rows': CROSSREF_ROWS,
+	}
+	response = requests.get(CROSSREF_URL, params=params, timeout=60)
+	response.raise_for_status()
+	return response.json()['message']['items']
+
+
+def normalize_text(text_value):
+	'Normalize text for matching.'
+	text_value = ftfy.fix_text(text_value)
+	text_value = html.unescape(text_value)
+	text_value = re.sub(r'<[^>]+>', ' ', text_value)
+	text_value = unicodedata.normalize('NFKD', text_value)
+	text_value = text_value.encode('ascii', 'ignore').decode('ascii')
+	text_value = text_value.lower().strip()
+	text_value = re.sub(r'[^\w\s]', ' ', text_value)
+	return ' '.join(text_value.split())
+
+
+def normalize_issn(issn_value):
+	'Normalize ISSN values for matching.'
+	return re.sub(r'[^0-9Xx]', '', issn_value).upper()
+
+
+def parse_scimago_sjr(raw_sjr):
+	'Convert SCImago SJR values to standard decimal format.'
+	raw_sjr = raw_sjr.strip()
+	if not raw_sjr:
+		return ''
+	normalized_sjr = raw_sjr.replace(',', '.')
+	return f'{float(normalized_sjr):.3f}'
+
+
+def extract_scimago_issns(raw_issn_value):
+	'Extract normalized ISSN values from one SCImago field.'
+	issn_values = []
+	for issn_value in re.split(r'[\s,]+', raw_issn_value.strip()):
+		normalized_issn = normalize_issn(issn_value)
+		if normalized_issn:
+			issn_values.append(normalized_issn)
+	return issn_values
+
+
+def load_scimago_sjr_by_issn(scimago_file_path):
+	'Load SCImago SJR values into an ISSN lookup.'
+	scimago_sjr_by_issn = {}
+	with open(scimago_file_path, newline='', encoding='utf-8') as scimago_handle:
+		reader = csv.DictReader(scimago_handle, delimiter=';')
+		for row in reader:
+			journal_sjr = parse_scimago_sjr(row['SJR'])
+			if not journal_sjr:
+				continue
+			for journal_issn in extract_scimago_issns(row['Issn']):
+				if journal_issn not in scimago_sjr_by_issn:
+					scimago_sjr_by_issn[journal_issn] = journal_sjr
+	return scimago_sjr_by_issn
+
+
+def extract_author_name(page_data):
+	'Extract the author name from the Scholar response.'
+	return page_data['author']['name']
+
+
+def extract_author_file_name(author_name):
+	'Format the author name for file naming.'
+	return author_name.replace(' ', '_')
+
+
+def extract_scholar_papers(page_data):
+	'Extract the minimal Scholar fields from one API response.'
+	papers = []
+	for article in page_data.get('articles', []):
+		cited_by = article.get('cited_by') or {}
+		papers.append({
+			'paper_id': article.get('citation_id'),
+			'title': article.get('title'),
+			'year': article.get('year'),
+			'venue_raw': article.get('publication'),
+			'citations': cited_by.get('value'),
+		})
+	return papers
+
+
+def has_next_page(page_data):
+	'Return whether SerpApi indicates another page is available.'
+	pagination = page_data.get('serpapi_pagination') or {}
+	return bool(pagination.get('next') or pagination.get('next_link'))
+
+
+def deduplicate_papers(papers):
+	'Keep the first occurrence of each paper_id.'
+	seen_paper_ids = set()
+	unique_papers = []
+	for paper in papers:
+		paper_id = paper['paper_id']
+		if paper_id in seen_paper_ids:
+			continue
+		seen_paper_ids.add(paper_id)
+		unique_papers.append(paper)
+	return unique_papers
+
+
+def extract_crossref_title(crossref_hit):
+	'Extract the first Crossref title value.'
+	title_values = crossref_hit.get('title') or []
+	if not title_values:
+		return ''
+	return title_values[0]
+
+
+def extract_crossref_author_names(crossref_hit):
+	'Extract normalized full author names from one Crossref hit.'
+	author_names = []
+	for author in crossref_hit.get('author') or []:
+		given_name = author.get('given', '')
+		family_name = author.get('family', '')
+		full_name = ' '.join(part for part in [given_name, family_name] if part).strip()
+		if full_name:
+			author_names.append(normalize_text(full_name))
+	return author_names
+
+
+def extract_first_crossref_author_name(crossref_hit):
+	'Extract the normalized full name of the first Crossref author.'
+	authors = crossref_hit.get('author') or []
+	if not authors:
+		return ''
+	first_author = authors[0]
+	given_name = first_author.get('given', '')
+	family_name = first_author.get('family', '')
+	full_name = ' '.join(part for part in [given_name, family_name] if part).strip()
+	if not full_name:
+		return ''
+	return normalize_text(full_name)
+
+
+def extract_name_parts(name_value):
+	'Extract normalized first and last name parts.'
+	name_value = normalize_text(name_value)
+	name_parts = name_value.split()
+	if not name_parts:
+		return '', ''
+	return name_parts[0], name_parts[-1]
+
+
+def extract_crossref_author_name_parts(crossref_hit):
+	'Extract normalized first and last name parts for Crossref authors.'
+	author_name_parts = []
+	for author in crossref_hit.get('author') or []:
+		given_name = author.get('given', '')
+		family_name = author.get('family', '')
+		full_name = ' '.join(part for part in [given_name, family_name] if part).strip()
+		if full_name:
+			author_name_parts.append(extract_name_parts(full_name))
+	return author_name_parts
+
+
+def has_author_name_match(author_name, crossref_hit):
+	'Return whether the query author matches by first or last name.'
+	target_first_name, target_last_name = extract_name_parts(author_name)
+	for crossref_first_name, crossref_last_name in extract_crossref_author_name_parts(crossref_hit):
+		if target_first_name and target_first_name == crossref_first_name:
+			return True
+		if target_last_name and target_last_name == crossref_last_name:
+			return True
+	return False
+
+
+def extract_crossref_issns(crossref_hit):
+	'Extract normalized ISSN values from one Crossref hit.'
+	journal_issns = []
+	for issn_value in crossref_hit.get('ISSN') or []:
+		normalized_issn = normalize_issn(issn_value)
+		if normalized_issn:
+			journal_issns.append(normalized_issn)
+	return journal_issns
+
+
+def extract_preprint_platform_name(crossref_hit):
+	'Extract a normalized platform identifier from the matched Crossref record.'
+	for institution_data in crossref_hit.get('institution') or []:
+		institution_name = institution_data.get('name', '')
+		normalized_institution_name = normalize_text(institution_name)
+		for platform_name in PREPRINT_PLATFORM_NAMES:
+			if platform_name in normalized_institution_name:
+				return platform_name
+	resource_data = crossref_hit.get('resource') or {}
+	resource_primary = resource_data.get('primary') or {}
+	resource_url = normalize_text(resource_primary.get('URL', ''))
+	for platform_name in PREPRINT_PLATFORM_NAMES:
+		if platform_name in resource_url:
+			return platform_name
+	return ''
+
+
+def is_crossref_preprint(crossref_hit):
+	'Return whether the matched Crossref record is a target preprint.'
+	publication_type = crossref_hit.get('type', '')
+	publication_subtype = crossref_hit.get('subtype', '')
+	if publication_type not in PREPRINT_PUBLICATION_TYPES and publication_subtype not in PREPRINT_SUBTYPES:
+		return False
+	return bool(extract_preprint_platform_name(crossref_hit))
+
+
+def build_doi_url(doi_value):
+	'Build a DOI URL from a DOI string.'
+	return f'https://doi.org/{doi_value}'
+
+
+def build_match_data(crossref_hit, author_name):
+	'Build the extracted metadata for one matched Crossref record.'
+	doi_value = crossref_hit.get('DOI')
+	journal_issns = extract_crossref_issns(crossref_hit)
+	first_author_name = extract_first_crossref_author_name(crossref_hit)
+	query_first_name, query_last_name = extract_name_parts(author_name)
+	first_author_first_name, first_author_last_name = extract_name_parts(first_author_name)
+	if first_author_name:
+		is_first_author = (
+			(query_first_name and query_first_name == first_author_first_name) or
+			(query_last_name and query_last_name == first_author_last_name)
+		)
+	else:
+		is_first_author = ''
+	is_preprint = is_crossref_preprint(crossref_hit)
+	return build_doi_url(doi_value), journal_issns, is_first_author, is_preprint
+
+
+def find_crossref_match(title, author_name):
+	'Return the preferred Crossref match for one paper.'
+	normalized_title = normalize_text(title)
+	crossref_hits = fetch_crossref_hits(title, author_name)
+	fallback_match = ('', [], '', False)
+	for crossref_hit in crossref_hits:
+		crossref_title = extract_crossref_title(crossref_hit)
+		doi_value = crossref_hit.get('DOI')
+		publication_type = crossref_hit.get('type', '')
+		if normalize_text(crossref_title) != normalized_title:
+			continue
+		if not has_author_name_match(author_name, crossref_hit):
+			continue
+		if not doi_value:
+			continue
+		match_data = build_match_data(crossref_hit, author_name)
+		if publication_type == 'journal-article':
+			return match_data
+		if not fallback_match[0]:
+			fallback_match = match_data
+	return fallback_match
+
+
+def find_journal_sjr(journal_issns, scimago_sjr_by_issn):
+	'Return the first SCImago SJR value matched by ISSN.'
+	for journal_issn in journal_issns:
+		if journal_issn in scimago_sjr_by_issn:
+			return scimago_sjr_by_issn[journal_issn]
+	return ''
+
+
+def add_paper_metadata(papers, author_name, scimago_sjr_by_issn):
+	'Add DOI URLs, SJR values, first-author status, and preprint status.'
+	papers_with_metadata = []
+	for paper in papers:
+		paper_url, journal_issns, is_first_author, is_preprint = find_crossref_match(paper['title'], author_name)
+		paper_with_metadata = dict(paper)
+		paper_with_metadata['paper_url'] = paper_url
+		paper_with_metadata['journal_sjr'] = find_journal_sjr(journal_issns, scimago_sjr_by_issn)
+		paper_with_metadata['is_first_author'] = is_first_author
+		paper_with_metadata['is_preprint'] = is_preprint
+		papers_with_metadata.append(paper_with_metadata)
+	return papers_with_metadata
+
+
+def save_raw_data(output_directory, author_file_name, author_id, raw_pages):
+	'Save all raw Scholar API responses for one author to disk.'
+	output_path = Path(output_directory)
+	output_path.mkdir(parents=True, exist_ok=True)
+	raw_path = output_path / f'{author_file_name}_raw.json'
+	raw_data = {
+		'author_id': author_id,
+		'pages': raw_pages,
+	}
+	with raw_path.open('w', encoding='utf-8') as raw_handle:
+		json.dump(raw_data, raw_handle, indent=2, ensure_ascii=False)
+	return raw_path
+
+
+def save_papers_csv(output_directory, author_file_name, papers):
+	'Save the flat paper table to CSV.'
+	output_path = Path(output_directory)
+	output_path.mkdir(parents=True, exist_ok=True)
+	csv_path = output_path / f'{author_file_name}_df.csv'
+	with csv_path.open('w', newline='', encoding='utf-8') as csv_handle:
+		writer = csv.DictWriter(csv_handle, fieldnames=CSV_COLUMNS)
+		writer.writeheader()
+		writer.writerows(papers)
+	return csv_path
+
+
+def collect_author_papers(api_key, author_id):
+	'Fetch all Scholar pages and return the author metadata and unique papers.'
+	start = 0
+	raw_pages = []
+	all_papers = []
+	author_name = None
+	while True:
+		page_data = fetch_author_page(api_key, author_id, start)
+		if author_name is None:
+			author_name = extract_author_name(page_data)
+		raw_pages.append(page_data)
+		all_papers.extend(extract_scholar_papers(page_data))
+		if not has_next_page(page_data):
+			break
+		start += PAGE_SIZE
+	author_file_name = extract_author_file_name(author_name)
+	return author_name, author_file_name, raw_pages, deduplicate_papers(all_papers)
+
+
+def run_pipeline(api_key, author_id, output_directory, scimago_file_path):
+	'Run the Scholar, Crossref, and SCImago pipeline for one author.'
+	scimago_sjr_by_issn = load_scimago_sjr_by_issn(scimago_file_path)
+	author_name, author_file_name, raw_pages, papers = collect_author_papers(api_key, author_id)
+	papers = add_paper_metadata(papers, author_name, scimago_sjr_by_issn)
+	raw_path = save_raw_data(output_directory, author_file_name, author_id, raw_pages)
+	csv_path = save_papers_csv(output_directory, author_file_name, papers)
+	return {
+		'author_id': author_id,
+		'author_name': author_name,
+		'total_papers': len(papers),
+		'papers_csv_path': str(csv_path),
+		'raw_json_path': str(raw_path),
+	}
+
+
+def main():
+	api_key = '71bb10ca0c813eed9a31871949e8863e2b6147a36b0f3cee667b9968bbcb310c'
+	author_id = 'bAGGaVkAAAAJ'
+	output_directory = 'C:\\Users\\mukid\\PycharmProjects\\metric\\out'
+	scimago_file_path = 'C:\\Users\\mukid\\PycharmProjects\\metric\\scimagojr2024.csv'
+	result = run_pipeline(api_key, author_id, output_directory, scimago_file_path)
+	print(json.dumps(result, indent=2))
+
+
+if __name__ == '__main__':
+	main()
