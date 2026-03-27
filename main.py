@@ -1,22 +1,39 @@
 import json
 from pipeline import run_pipeline
 
-# from author_resolver import resolve_author_ids_from_csv
-#
-# api_key = '71bb10ca0c813eed9a31871949e8863e2b6147a36b0f3cee667b9968bbcb310c'
-# input_csv_path = 'C:\\Users\\mukid\\PycharmProjects\\metric\\orcid_huji_phd_2020.csv'
-# output_csv_path = 'C:\\Users\\mukid\\PycharmProjects\\metric\\orcid_huji_phd_2020_id.csv'
-#
-# resolve_author_ids_from_csv(api_key, input_csv_path, output_csv_path)
 
 def main():
-	api_key = '71bb10ca0c813eed9a31871949e8863e2b6147a36b0f3cee667b9968bbcb310c'
-	author_id = 'bAGGaVkAAAAJ'						#'2w2RgPkAAAAJ' #'bAGGaVkAAAAJ'
-	output_directory = 'C:\\Users\\mukid\\PycharmProjects\\metric\\out'
+	input_json_path = 'C:\\Users\\mukid\\PycharmProjects\\metric\\phd_2022.json'
+	output_json_path = 'C:\\Users\\mukid\\PycharmProjects\\metric\\out\\phd_2022_res.json'
 	scimago_file_path = 'C:\\Users\\mukid\\PycharmProjects\\metric\\scimagojr2024.csv'
-	result = run_pipeline(api_key, author_id, output_directory, scimago_file_path)
-	print(json.dumps(result, indent=2))
+	results = run_pipeline(input_json_path, output_json_path, scimago_file_path)
+	print(json.dumps(results, indent=2))
 
 
 if __name__ == '__main__':
 	main()
+
+#
+# import json
+# from pipeline import run_pipeline, score_author
+# from helpers import load_author_list, load_scimago_sjr_by_issn
+# from datetime import datetime
+#
+#
+# def main():
+# 	input_json_path = 'C:\\Users\\mukid\\PycharmProjects\\metric\\phd_2022.json'
+# 	output_json_path = 'C:\\Users\\mukid\\PycharmProjects\\metric\\out\\results.json'
+# 	scimago_file_path = 'C:\\Users\\mukid\\PycharmProjects\\metric\\scimagojr2024.csv'
+# 	test_author_name = 'Ohad Peled'
+# 	author_list = load_author_list(input_json_path)
+# 	author_entry = next((a for a in author_list if a['name'] == test_author_name), None)
+# 	if author_entry is None:
+# 		print(f'Author not found: {test_author_name}')
+# 		return
+# 	scimago_sjr_by_issn = load_scimago_sjr_by_issn(scimago_file_path)
+# 	result = score_author(author_entry, scimago_sjr_by_issn, datetime.now().year)
+# 	print(json.dumps(result, indent=2))
+#
+#
+# if __name__ == '__main__':
+# 	main()
