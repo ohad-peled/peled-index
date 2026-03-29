@@ -8,6 +8,8 @@ from pathlib import Path
 import ftfy
 import requests
 
+_session = requests.Session()
+_session.headers.update({'User-Agent': 'PeledIndex/1.0 (mailto:your@email.com)'})
 
 CROSSREF_URL = 'https://api.crossref.org/works'
 CROSSREF_ROWS = 5
@@ -16,14 +18,21 @@ PREPRINT_PUBLICATION_TYPES = {'posted-content', 'preprint'}
 PREPRINT_SUBTYPES = {'preprint'}
 
 
-def fetch_crossref_hits(title, author_name):
+# helpers.py
+def create_crossref_session():
+	'Create a reusable HTTP session for Crossref API calls.'
+	session = requests.Session()
+	session.headers.update({'User-Agent': 'PeledIndex/1.0 (mailto:your@email.com)'})
+	return session
+
+def fetch_crossref_hits(title, author_name, session):
 	'Fetch Crossref candidate records for one paper.'
 	params = {
 		'query.title': title,
 		'query.author': author_name,
 		'rows': CROSSREF_ROWS,
 	}
-	response = requests.get(CROSSREF_URL, params=params, timeout=60)
+	response = session.get(CROSSREF_URL, params=params, timeout=60)
 	response.raise_for_status()
 	return response.json()['message']['items']
 
@@ -70,12 +79,11 @@ def load_scimago_sjr_by_issn(scimago_file_path):
 	with open(scimago_file_path, newline='', encoding='utf-8') as scimago_handle:
 		reader = csv.DictReader(scimago_handle, delimiter=';')
 		for row in reader:
-			journal_sjr = parse_scimago_sjr(row['SJR'])
+			journal_sjr = parse_scimago_sjr(row.get('SJR', ''))
 			if not journal_sjr:
 				continue
-			for journal_issn in extract_scimago_issns(row['Issn']):
-				if journal_issn not in scimago_sjr_by_issn:
-					scimago_sjr_by_issn[journal_issn] = journal_sjr
+			for journal_issn in extract_scimago_issns(row.get('Issn', '')):
+				scimago_sjr_by_issn.setdefault(journal_issn, journal_sjr)
 	return scimago_sjr_by_issn
 
 
