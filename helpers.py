@@ -18,23 +18,17 @@ PREPRINT_PUBLICATION_TYPES = {'posted-content', 'preprint'}
 PREPRINT_SUBTYPES = {'preprint'}
 
 
-# helpers.py
-def create_crossref_session():
-	'Create a reusable HTTP session for Crossref API calls.'
-	session = requests.Session()
-	session.headers.update({'User-Agent': 'PeledIndex/1.0 (mailto:your@email.com)'})
-	return session
-
-def fetch_crossref_hits(title, author_name, session):
+def fetch_crossref_hits(title, author_name):
 	'Fetch Crossref candidate records for one paper.'
 	params = {
 		'query.title': title,
 		'query.author': author_name,
 		'rows': CROSSREF_ROWS,
 	}
-	response = session.get(CROSSREF_URL, params=params, timeout=60)
+	response = _session.get(CROSSREF_URL, params=params, timeout=60)
 	response.raise_for_status()
 	return response.json()['message']['items']
+
 
 
 def normalize_text(text_value):
