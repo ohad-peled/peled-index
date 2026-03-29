@@ -9,24 +9,25 @@ from helpers import (
 	save_results_json,
 )
 
+from concurrent.futures import ThreadPoolExecutor
 
 def build_papers_from_titles(titles, author_name, scimago_sjr_by_issn, max_workers=8):
-	'Fetch and enrich all papers for one author from Crossref and SCImago.'
-	def process_title(title):
-		paper_url, journal_issns, is_first_author, is_preprint, year, venue, citations = find_crossref_match(title, author_name)
-		return {
-			'title': title,
-			'year': year,
-			'venue_raw': venue,
-			'citations': citations,
-			'paper_url': paper_url,
-			'journal_sjr': find_journal_sjr(journal_issns, scimago_sjr_by_issn),
-			'is_first_author': is_first_author,
-			'is_preprint': is_preprint,
-		}
-	with ThreadPoolExecutor(max_workers=max_workers) as executor:
-		papers = list(executor.map(process_title, titles))
-	return deduplicate_papers(papers)
+    'Fetch and enrich all papers for one author from Crossref and SCImago.'
+    def process_title(title):
+        paper_url, journal_issns, is_first_author, is_preprint, year, venue, citations = find_crossref_match(title, author_name)
+        return {
+            'title': title,
+            'year': year,
+            'venue_raw': venue,
+            'citations': citations,
+            'paper_url': paper_url,
+            'journal_sjr': find_journal_sjr(journal_issns, scimago_sjr_by_issn),
+            'is_first_author': is_first_author,
+            'is_preprint': is_preprint,
+        }
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        papers = list(executor.map(process_title, titles))
+    return deduplicate_papers(papers)
 
 
 def parse_year(year_value):
@@ -99,13 +100,13 @@ def score_author(author_entry, scimago_sjr_by_issn, current_year):
 
 
 def run_pipeline(input_json_path, output_json_path, scimago_file_path):
-	'Run the Crossref and SCImago pipeline for all authors in the input file.'
-	scimago_sjr_by_issn = load_scimago_sjr_by_issn(scimago_file_path)
-	author_list = load_author_list(input_json_path)
-	current_year = datetime.now().year
-	results = []
-	for author_index, author_entry in enumerate(author_list, start=1):
-		print(f'Processing author {author_index}: {author_entry["name"]}')
-		results.append(score_author(author_entry, scimago_sjr_by_issn, current_year))
-	save_results_json(output_json_path, results)
-	return results
+    'Run the Crossref and SCImago pipeline for all authors in the input file.'
+    scimago_sjr_by_issn = load_scimago_sjr_by_issn(scimago_file_path)
+    author_list = load_author_list(input_json_path)
+    current_year = datetime.now().year
+    results = []
+    for author_index, author_entry in enumerate(author_list, start=1):
+        print(f'Processing author {author_index}: {author_entry["name"]}')
+        results.append(score_author(author_entry, scimago_sjr_by_issn, current_year))
+    save_results_json(output_json_path, results)
+    return results
