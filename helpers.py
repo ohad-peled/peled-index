@@ -2,6 +2,7 @@ import csv
 import html
 import json
 import re
+import time
 import unicodedata
 from pathlib import Path
 
@@ -25,9 +26,14 @@ def fetch_crossref_hits(title, author_name):
 		'query.author': author_name,
 		'rows': CROSSREF_ROWS,
 	}
-	response = _session.get(CROSSREF_URL, params=params, timeout=60)
-	response.raise_for_status()
-	return response.json()['message']['items']
+	for attempt in range(5):
+		response = _session.get(CROSSREF_URL, params=params, timeout=60)
+		if response.status_code == 429:
+			time.sleep(2 ** attempt)
+			continue
+		response.raise_for_status()
+		return response.json()['message']['items']
+	return []
 
 
 

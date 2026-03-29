@@ -11,7 +11,7 @@ from helpers import (
 
 from concurrent.futures import ThreadPoolExecutor
 
-def build_papers_from_titles(titles, author_name, scimago_sjr_by_issn, max_workers=8):
+def build_papers_from_titles(titles, author_name, scimago_sjr_by_issn, max_workers=4):
     'Fetch and enrich all papers for one author from Crossref and SCImago.'
     def process_title(title):
         paper_url, journal_issns, is_first_author, is_preprint, year, venue, citations = find_crossref_match(title, author_name)
