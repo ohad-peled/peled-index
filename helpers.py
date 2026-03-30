@@ -2,6 +2,7 @@ import csv
 import html
 import json
 import re
+import time
 import unicodedata
 from pathlib import Path
 
@@ -18,23 +19,51 @@ PREPRINT_PUBLICATION_TYPES = {'posted-content', 'preprint'}
 PREPRINT_SUBTYPES = {'preprint'}
 
 
-# helpers.py
-def create_crossref_session():
-	'Create a reusable HTTP session for Crossref API calls.'
-	session = requests.Session()
-	session.headers.update({'User-Agent': 'PeledIndex/1.0 (mailto:your@email.com)'})
-	return session
+SCIMAGO_AREA_TO_FIELD = {
+    'Agricultural and Biological Sciences':             'Life Sciences',
+    'Biochemistry, Genetics and Molecular Biology':     'Life Sciences',
+    'Environmental Science':                            'Life Sciences',
+    'Immunology and Microbiology':                      'Life Sciences',
+    'Medicine':                                         'Life Sciences',
+    'Neuroscience':                                     'Life Sciences',
+    'Nursing':                                          'Life Sciences',
+    'Pharmacology, Toxicology and Pharmaceutics':       'Life Sciences',
+    'Veterinary':                                       'Life Sciences',
+    'Dentistry':                                        'Life Sciences',
+    'Health Professions':                               'Life Sciences',
+    'Earth and Planetary Sciences':                     'Life Sciences',
+    'Chemistry':                                        'Physics and Chemistry',
+    'Chemical Engineering':                             'Physics and Chemistry',
+    'Materials Science':                                'Physics and Chemistry',
+    'Physics and Astronomy':                            'Physics and Chemistry',
+    'Energy':                                           'Physics and Chemistry',
+    'Computer Science':                                 'Computer Science and Engineering',
+    'Engineering':                                      'Computer Science and Engineering',
+    'Mathematics':                                      'Computer Science and Engineering',
+    'Arts and Humanities':                              'Social Sciences and Humanities',
+    'Business, Management and Accounting':              'Social Sciences and Humanities',
+    'Decision Sciences':                                'Social Sciences and Humanities',
+    'Economics, Econometrics and Finance':              'Social Sciences and Humanities',
+    'Psychology':                                       'Social Sciences and Humanities',
+    'Social Sciences':                                  'Social Sciences and Humanities',
+}
 
-def fetch_crossref_hits(title, author_name, session):
+def fetch_crossref_hits(title, author_name):
 	'Fetch Crossref candidate records for one paper.'
 	params = {
 		'query.title': title,
 		'query.author': author_name,
 		'rows': CROSSREF_ROWS,
 	}
-	response = session.get(CROSSREF_URL, params=params, timeout=60)
-	response.raise_for_status()
-	return response.json()['message']['items']
+	for attempt in range(5):
+		response = _session.get(CROSSREF_URL, params=params, timeout=60)
+		if response.status_code == 429:
+			time.sleep(2 ** attempt)
+			continue
+		response.raise_for_status()
+		return response.json()['message']['items']
+	return []
+
 
 
 def normalize_text(text_value):
@@ -63,6 +92,18 @@ def parse_scimago_sjr(raw_sjr):
 	return f'{float(normalized_sjr):.3f}'
 
 
+def parse_scimago_areas(raw_areas):
+    'Convert raw SCImago Areas string to a sorted list of mapped fields.'
+    if not raw_areas or not raw_areas.strip():
+        return []
+    mapped_fields = set()
+    for area_name in raw_areas.split(';'):
+        field = SCIMAGO_AREA_TO_FIELD.get(area_name.strip())
+        if field:
+            mapped_fields.add(field)
+    return sorted(mapped_fields)
+
+
 def extract_scimago_issns(raw_issn_value):
 	'Extract normalized ISSN values from one SCImago field.'
 	issn_values = []
@@ -73,18 +114,22 @@ def extract_scimago_issns(raw_issn_value):
 	return issn_values
 
 
-def load_scimago_sjr_by_issn(scimago_file_path):
-	'Load SCImago SJR values into an ISSN lookup.'
-	scimago_sjr_by_issn = {}
-	with open(scimago_file_path, newline='', encoding='utf-8') as scimago_handle:
-		reader = csv.DictReader(scimago_handle, delimiter=';')
-		for row in reader:
-			journal_sjr = parse_scimago_sjr(row.get('SJR', ''))
-			if not journal_sjr:
-				continue
-			for journal_issn in extract_scimago_issns(row.get('Issn', '')):
-				scimago_sjr_by_issn.setdefault(journal_issn, journal_sjr)
-	return scimago_sjr_by_issn
+def load_scimago_data_by_issn(scimago_file_path):
+    'Load SCImago SJR values and scientific fields by ISSN in one pass.'
+    sjr_by_issn = {}
+    fields_by_issn = {}
+    with open(scimago_file_path, newline='', encoding='utf-8') as scimago_handle:
+        reader = csv.DictReader(scimago_handle, delimiter=';')
+        for row in reader:
+            journal_sjr = parse_scimago_sjr(row.get('SJR', ''))
+            journal_fields = parse_scimago_areas(row.get('Areas', ''))
+            for journal_issn in extract_scimago_issns(row.get('Issn', '')):
+                if journal_sjr:
+                    sjr_by_issn.setdefault(journal_issn, journal_sjr)
+                if journal_fields:
+                    fields_by_issn.setdefault(journal_issn, journal_fields)
+    return sjr_by_issn, fields_by_issn
+
 
 
 def load_author_list(input_json_path):
@@ -280,3 +325,10 @@ def find_journal_sjr(journal_issns, scimago_sjr_by_issn):
 		if journal_issn in scimago_sjr_by_issn:
 			return scimago_sjr_by_issn[journal_issn]
 	return ''
+
+def find_journal_fields(journal_issns, scimago_fields_by_issn):
+    'Return the list of scientific fields matched by ISSN.'
+    for journal_issn in journal_issns:
+        if journal_issn in scimago_fields_by_issn:
+            return scimago_fields_by_issn[journal_issn]
+    return []
