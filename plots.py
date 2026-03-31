@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-RESULTS_JSON_PATH = 'C:\\Users\\mukid\\PycharmProjects\\metric\\out\\phd_2022_res.json'
+RESULTS_JSON_PATH = 'C:\\Users\\mukid\\PycharmProjects\\metric\\out\\phd_2010-2025_isr_res.json'
 CANDIDATE_NAME = 'Ohad Peled'
 
 
@@ -34,7 +34,7 @@ def compute_percentile(scores, candidate_score):
 def plot_score_distribution(scores, candidate_score, candidate_name, percentile):
 	'Plot the author score histogram with an optional candidate marker.'
 	fig, ax = plt.subplots(figsize=(10, 6))
-	ax.hist(scores, bins=50, color='steelblue', edgecolor='white')
+	ax.hist(scores, bins=100, color='steelblue', edgecolor='white')
 	if candidate_score is not None:
 		ax.axvline(candidate_score, color='crimson', linewidth=2, label=f'{candidate_name} (percentile: {percentile})')
 		ax.legend()
@@ -48,7 +48,6 @@ def plot_score_distribution(scores, candidate_score, candidate_name, percentile)
 def main():
 	results = load_results(RESULTS_JSON_PATH)
 	scores = extract_author_scores(results)
-	print(scores)
 	candidate_score = find_candidate_score(results, CANDIDATE_NAME)
 	percentile = compute_percentile(scores, candidate_score) if candidate_score is not None else None
 	if candidate_score is None:

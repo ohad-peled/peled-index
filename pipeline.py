@@ -1,17 +1,20 @@
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from helpers import (
-	deduplicate_papers,
-	find_crossref_match,
-	find_journal_sjr,
-	load_author_list,
-	load_scimago_sjr_by_issn,
-	save_results_json,
+    deduplicate_papers,
+    find_crossref_match,
+    find_journal_fields,
+    find_journal_sjr,
+    load_author_list,
+    load_scimago_data_by_issn,
+    save_results_json,
 )
+
 
 from concurrent.futures import ThreadPoolExecutor
 
-def build_papers_from_titles(titles, author_name, scimago_sjr_by_issn, max_workers=4):
+
+def build_papers_from_titles(titles, author_name, scimago_sjr_by_issn, scimago_fields_by_issn, max_workers=8):
     'Fetch and enrich all papers for one author from Crossref and SCImago.'
     def process_title(title):
         paper_url, journal_issns, is_first_author, is_preprint, year, venue, citations = find_crossref_match(title, author_name)
@@ -22,6 +25,7 @@ def build_papers_from_titles(titles, author_name, scimago_sjr_by_issn, max_worke
             'citations': citations,
             'paper_url': paper_url,
             'journal_sjr': find_journal_sjr(journal_issns, scimago_sjr_by_issn),
+            'journal_issns': journal_issns,
             'is_first_author': is_first_author,
             'is_preprint': is_preprint,
         }
@@ -85,28 +89,36 @@ def compute_author_score(papers, current_year):
 	return round(sum(paper_scores) / active_years, 6)
 
 
-def score_author(author_entry, scimago_sjr_by_issn, current_year):
-	'Build and score one author entry from the input JSON.'
-	author_name = author_entry['name']
-	papers = build_papers_from_titles(author_entry['publications'], author_name, scimago_sjr_by_issn)
-	author_score = compute_author_score(papers, current_year)
-	return {
-		'name': author_name,
-		'institution': author_entry.get('institution', ''),
-		'author_score': author_score,
-		'total_papers': len(papers),
-		'papers': papers,
-	}
+def score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, current_year):
+    'Build and score one author entry from the input JSON.'
+    author_name = author_entry['name']
+    papers = build_papers_from_titles(author_entry['publications'], author_name, scimago_sjr_by_issn, scimago_fields_by_issn)
+    author_score = compute_author_score(papers, current_year)
+    author_fields = sorted({
+        field
+        for paper in papers
+        for field in find_journal_fields(paper.pop('journal_issns', []), scimago_fields_by_issn)
+    })
+    return {
+        'name': author_name,
+        'institution': author_entry.get('institution', ''),
+        'author_score': author_score,
+        'total_papers': len(papers),
+        'fields': author_fields,
+        'papers': papers,
+    }
+
 
 
 def run_pipeline(input_json_path, output_json_path, scimago_file_path):
     'Run the Crossref and SCImago pipeline for all authors in the input file.'
-    scimago_sjr_by_issn = load_scimago_sjr_by_issn(scimago_file_path)
+    scimago_sjr_by_issn, scimago_fields_by_issn = load_scimago_data_by_issn(scimago_file_path)
     author_list = load_author_list(input_json_path)
     current_year = datetime.now().year
     results = []
     for author_index, author_entry in enumerate(author_list, start=1):
         print(f'Processing author {author_index}: {author_entry["name"]}')
-        results.append(score_author(author_entry, scimago_sjr_by_issn, current_year))
+        results.append(score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, current_year))
     save_results_json(output_json_path, results)
     return results
+
