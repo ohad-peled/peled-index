@@ -58,7 +58,7 @@ def parse_float(value):
 		return None
 
 
-def compute_author_score(papers, current_year):
+def compute_author_score(papers, current_year,non_first_score=0.2):
 	'Compute the raw author score from the paper table.'
 	publication_years = []
 	paper_scores = []
@@ -75,7 +75,7 @@ def compute_author_score(papers, current_year):
 		citations = parse_int(paper.get('citations'))
 		citations_per_year = citations / paper_age
 		is_first_author = paper.get('is_first_author')
-		authorship_weight = 1.0 if is_first_author is True or is_first_author == 'True' else 0.4
+		authorship_weight = 1.0 if is_first_author is True or is_first_author == 'True' else non_first_score
 		paper_score = authorship_weight * (
 			(0.6 * citations_per_year) +
 			(0.4 * journal_sjr)
@@ -102,6 +102,7 @@ def score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, curr
     return {
         'name': author_name,
         'institution': author_entry.get('institution', ''),
+        'start_year': parse_year(author_entry['start_year']),
         'author_score': author_score,
         'total_papers': len(papers),
         'fields': author_fields,
