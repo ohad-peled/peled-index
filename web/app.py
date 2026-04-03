@@ -5,11 +5,13 @@ from typing import Dict, List
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from web.api.routes import router
 from web.utils import make_author_id
 
-RESULTS_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'results.json')
+RESULTS_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'phd_2010-2025_isr_res.json')
+STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
 
 def _build_index(results: List[dict]) -> Dict[str, dict]:
@@ -40,3 +42,5 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix='/api')
+
+app.mount('/', StaticFiles(directory=STATIC_DIR, html=True), name='static')
