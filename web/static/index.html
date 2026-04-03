@@ -8,7 +8,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #0f1117;
+      background: #0a0e27;
       color: #cccccc;
       font-family: 'Segoe UI', system-ui, sans-serif;
       min-height: 100vh;
@@ -26,7 +26,7 @@
 
     .subtitle {
       text-align: center;
-      color: #666680;
+      color: #8b8fb8;
       font-size: 0.95rem;
       margin-bottom: 2rem;
     }
@@ -41,8 +41,8 @@
     #search-input {
       width: 100%;
       padding: 0.75rem 1rem;
-      background: #1a1b26;
-      border: 1px solid #2a2a3a;
+      background: #111827;
+      border: 1px solid #1e2a4a;
       border-radius: 8px;
       color: #ffffff;
       font-size: 1rem;
@@ -51,10 +51,10 @@
     }
 
     #search-input:focus {
-      border-color: #4a90d9;
+      border-color: #00d9ff;
     }
 
-    #search-input::placeholder { color: #555566; }
+    #search-input::placeholder { color: #7a7d9a; }
 
     /* ── Dropdown ── */
     #dropdown {
@@ -62,8 +62,8 @@
       top: calc(100% + 4px);
       left: 0;
       right: 0;
-      background: #1a1b26;
-      border: 1px solid #2a2a3a;
+      background: #111827;
+      border: 1px solid #1e2a4a;
       border-radius: 8px;
       overflow: hidden;
       z-index: 100;
@@ -77,12 +77,12 @@
     .dropdown-item {
       padding: 0.65rem 1rem;
       cursor: pointer;
-      border-bottom: 1px solid #1e1e2e;
+      border-bottom: 1px solid #131929;
       transition: background 0.15s;
     }
 
     .dropdown-item:last-child { border-bottom: none; }
-    .dropdown-item:hover { background: #252538; }
+    .dropdown-item:hover { background: #151d35; }
 
     .dropdown-item .item-name {
       color: #ffffff;
@@ -91,21 +91,21 @@
     }
 
     .dropdown-item .item-meta {
-      color: #888899;
+      color: #a0a3c0;
       font-size: 0.8rem;
       margin-top: 2px;
     }
 
     .dropdown-item .item-score {
       float: right;
-      color: #4a90d9;
+      color: #00d9ff;
       font-weight: 700;
       font-size: 0.9rem;
     }
 
     #dropdown-status {
       padding: 0.65rem 1rem;
-      color: #666680;
+      color: #8b8fb8;
       font-size: 0.85rem;
       text-align: center;
     }
@@ -120,8 +120,8 @@
     #author-card.visible { display: block; }
 
     .card {
-      background: #1a1b26;
-      border: 1px solid #2a2a3a;
+      background: #111827;
+      border: 1px solid #1e2a4a;
       border-radius: 10px;
       padding: 1.25rem 1.5rem;
       margin-bottom: 1.5rem;
@@ -135,7 +135,7 @@
     }
 
     .card .institution {
-      color: #888899;
+      color: #a0a3c0;
       font-size: 0.9rem;
       margin-bottom: 0.75rem;
     }
@@ -153,14 +153,14 @@
     }
 
     .stat-label {
-      color: #555566;
+      color: #7a7d9a;
       font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
 
     .stat-value {
-      color: #4a90d9;
+      color: #00d9ff;
       font-size: 1.1rem;
       font-weight: 700;
     }
@@ -173,19 +173,19 @@
     }
 
     .field-tag {
-      background: #252538;
-      border: 1px solid #333344;
+      background: #151d35;
+      border: 1px solid #252d50;
       border-radius: 20px;
       padding: 0.25rem 0.7rem;
       font-size: 0.8rem;
-      color: #aaaacc;
+      color: #b8bcdc;
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s;
     }
 
     .field-tag:hover, .field-tag.active {
-      background: #2a5fa8;
-      border-color: #4a90d9;
+      background: #0096ff;
+      border-color: #00d9ff;
       color: #ffffff;
     }
 
@@ -196,8 +196,8 @@
     }
 
     .plot-container {
-      background: #1a1b26;
-      border: 1px solid #2a2a3a;
+      background: #111827;
+      border: 1px solid #1e2a4a;
       border-radius: 10px;
       padding: 1rem 1.25rem 1.25rem;
       margin-bottom: 1.5rem;
@@ -225,11 +225,11 @@
     }
 
     .plot-stat {
-      color: #888899;
+      color: #a0a3c0;
     }
 
     .plot-stat span {
-      color: #4a90d9;
+      color: #00d9ff;
       font-weight: 600;
     }
 
@@ -245,21 +245,21 @@
     .plot-loading {
       text-align: center;
       padding: 2rem;
-      color: #555566;
+      color: #7a7d9a;
       font-size: 0.9rem;
     }
 
     .plot-error {
       text-align: center;
       padding: 1.5rem;
-      color: #e8475f;
+      color: #ff3366;
       font-size: 0.85rem;
     }
 
     /* ── Scrollbar ── */
     ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #0f1117; }
-    ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+    ::-webkit-scrollbar-track { background: #0a0e27; }
+    ::-webkit-scrollbar-thumb { background: #1e2a4a; border-radius: 3px; }
   </style>
 </head>
 <body>
