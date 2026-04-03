@@ -1,0 +1,82 @@
+from typing import Dict, List, Optional
+
+from core.plots import (
+    filter_eligible_authors_by_field,
+    extract_author_scores,
+    compute_percentile,
+    plot_score_distribution_for_field,
+)
+from web.utils import make_author_id
+
+
+def search_authors(query: str, index: Dict[str, dict]) -> List[dict]:
+    """Return authors whose name contains the query string (case-insensitive)."""
+    query_lower = query.lower()
+    matches = []
+    for entry in index.values():
+        if query_lower in entry['name'].lower():
+            matches.append({
+                'author_id': make_author_id(entry['name'], entry.get('institution', '')),
+                'name': entry['name'],
+                'institution': entry.get('institution', ''),
+                'author_score': entry.get('author_score', 0),
+                'total_papers': entry.get('total_papers', 0),
+                'fields': entry.get('fields', []),
+            })
+    return matches
+
+
+def get_author(author_id: str, index: Dict[str, dict]) -> Optional[dict]:
+    """Return the full author entry for the given author ID, or None if not found."""
+    return index.get(author_id)
+
+
+def generate_plot(
+    author_id: str,
+    field: str,
+    results: List[dict],
+    index: Dict[str, dict],
+) -> Optional[dict]:
+    """
+    Generate a Base64-encoded plot for the given author in the specified field.
+
+    Returns a dict with keys: plot_base64, percentile, comparison_group_size.
+    Returns None if the author is not found.
+    Returns a dict with an 'error' key if the author has no valid score or field.
+    """
+    entry = index.get(author_id)
+    if entry is None:
+        return None
+
+    candidate_score = entry.get('author_score', 0)
+    candidate_fields = entry.get('fields', [])
+
+    if candidate_score == 0:
+        return {'error': f"{entry['name']} has a score of 0."}
+
+    if not candidate_fields:
+        return {'error': f"{entry['name']} has no fields."}
+
+    if field not in candidate_fields:
+        return {'error': f"Field '{field}' not found for {entry['name']}."}
+
+    eligible = filter_eligible_authors_by_field(results, field)
+    scores = extract_author_scores(eligible)
+
+    if not scores:
+        return {'error': f"No eligible authors found for field '{field}'."}
+
+    percentile = compute_percentile(scores, candidate_score)
+    plot_base64 = plot_score_distribution_for_field(
+        scores,
+        candidate_score,
+        entry['name'],
+        percentile,
+        field,
+    )
+
+    return {
+        'plot_base64': plot_base64,
+        'percentile': percentile,
+        'comparison_group_size': len(scores),
+    }
