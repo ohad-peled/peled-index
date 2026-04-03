@@ -1,22 +1,19 @@
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 from matplotlib.ticker import FuncFormatter
-
-
-RESULTS_JSON_PATH = 'C:\\Users\\mukid\\PycharmProjects\\metric\\out\\phd_2010-2025_isr_res.json'
-CANDIDATE_NAME = 'Jotham Suez'
+import io
+import base64
 
 
 def load_results(results_json_path):
-    'Load the scored author results from the output JSON file.'
+    """Load the scored author results from the output JSON file."""
     with open(results_json_path, encoding='utf-8') as results_handle:
         return json.load(results_handle)
 
 
 def find_candidate_entry(results, candidate_name):
-    'Find the full entry for a specific candidate by name.'
+    """Find the full entry for a specific candidate by name."""
     for entry in results:
         if entry['name'] == candidate_name:
             return entry
@@ -24,7 +21,7 @@ def find_candidate_entry(results, candidate_name):
 
 
 def filter_eligible_authors_by_field(results, field):
-    'Return authors with a non-zero score, non-empty fields, and membership in the given field.'
+    """Return authors with a non-zero score, non-empty fields, and membership in the given field."""
     return [
         entry for entry in results
         if entry['author_score'] > 0
@@ -34,17 +31,28 @@ def filter_eligible_authors_by_field(results, field):
 
 
 def extract_author_scores(results):
-    'Extract all author scores from the results list.'
+    """Extract all author scores from the results list."""
     return [entry['author_score'] for entry in results]
 
 
 def compute_percentile(scores, candidate_score):
-    'Compute the percentile of a candidate score within the distribution.'
+    """Compute the percentile of a candidate score within the distribution."""
     return round(np.mean(np.array(scores) < candidate_score) * 100, 1)
 
 
+def _ordinal_suffix(percentile):
+    """Return the ordinal suffix for a percentile number."""
+    p = int(percentile)
+    if 11 <= p % 100 <= 13:
+        return 'th'
+    return {1: 'st', 2: 'nd', 3: 'rd'}.get(p % 10, 'th')
+
+
 def plot_score_distribution_for_field(scores, candidate_score, candidate_name, percentile, field):
-    'Plot a styled author score histogram for a single field with an annotated candidate marker.'
+    """
+    Generate a styled author score histogram as a Base64 PNG image.
+    Returns the plot as a Base64-encoded string instead of displaying it.
+    """
     fig, ax = plt.subplots(figsize=(12, 6))
 
     # Background
@@ -132,52 +140,61 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
     ax.set_axisbelow(True)
 
     plt.tight_layout()
-    plt.show()
+
+    # ===== NEW: Convert plot to Base64 instead of showing it =====
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png', facecolor='#0f1117')
+    buffer.seek(0)
+    image_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+    plt.close(fig)  # Close to free memory
+    
+    return image_base64
 
 
-def _ordinal_suffix(percentile):
-    'Return the ordinal suffix for a percentile number.'
-    p = int(percentile)
-    if 11 <= p % 100 <= 13:
-        return 'th'
-    return {1: 'st', 2: 'nd', 3: 'rd'}.get(p % 10, 'th')
-
-
-def main():
-    results = load_results(RESULTS_JSON_PATH)
-    candidate_entry = find_candidate_entry(results, CANDIDATE_NAME)
+def generate_plots_for_author(results_json_path, candidate_name):
+    """
+    Generate plots for all fields of an author.
+    Returns a dictionary: { field_name: base64_image, ... }
+    """
+    results = load_results(results_json_path)
+    candidate_entry = find_candidate_entry(results, candidate_name)
 
     if candidate_entry is None:
-        print(f'Candidate not found: {CANDIDATE_NAME}')
-        return
+        return {'error': f'Candidate not found: {candidate_name}'}
 
     candidate_score = candidate_entry['author_score']
     candidate_fields = candidate_entry['fields']
 
     if candidate_score == 0:
-        print(f'Warning: {CANDIDATE_NAME} has a score of 0.')
+        return {'error': f'{candidate_name} has a score of 0.'}
 
     if not candidate_fields:
-        print(f'Warning: {CANDIDATE_NAME} has no fields — no comparison group can be built.')
-        return
+        return {'error': f'{candidate_name} has no fields.'}
 
-    print(f'\nCandidate : {CANDIDATE_NAME}')
-    print(f'Score     : {candidate_score}')
-    print(f'Fields    : {", ".join(candidate_fields)}')
-    print(f'Producing one plot per field.\n')
-
+    plots_by_field = {}
+    
     for field in candidate_fields:
         eligible = filter_eligible_authors_by_field(results, field)
         scores = extract_author_scores(eligible)
 
         if not scores:
-            print(f'  [{field}] No eligible authors in comparison group — skipping plot.')
             continue
 
         percentile = compute_percentile(scores, candidate_score)
-        print(f'  [{field}] comparison_group={len(scores)}, percentile={percentile}')
-        plot_score_distribution_for_field(scores, candidate_score, CANDIDATE_NAME, percentile, field)
+        
+        # Generate plot as Base64
+        plot_base64 = plot_score_distribution_for_field(
+            scores, 
+            candidate_score, 
+            candidate_name, 
+            percentile, 
+            field
+        )
+        
+        plots_by_field[field] = {
+            'plot_base64': plot_base64,
+            'percentile': percentile,
+            'comparison_group_size': len(scores)
+        }
 
-
-if __name__ == '__main__':
-    main()
+    return plots_by_field
