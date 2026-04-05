@@ -3,12 +3,12 @@
 (function () {
   'use strict';
 
-  const searchInput   = document.getElementById('search-input');
-  const dropdown      = document.getElementById('dropdown');
+  const searchInput    = document.getElementById('search-input');
+  const dropdown       = document.getElementById('dropdown');
   const dropdownStatus = document.getElementById('dropdown-status');
-  const authorCard    = document.getElementById('author-card');
-  const authorInfo    = document.getElementById('author-info');
-  const plotsSection  = document.getElementById('plots-section');
+  const authorCard     = document.getElementById('author-card');
+  const authorInfo     = document.getElementById('author-info');
+  const plotsSection   = document.getElementById('plots-section');
 
   let searchTimer = null;
   let currentAuthorId = null;
@@ -40,7 +40,6 @@
   }
 
   function clearDropdownItems() {
-    // Remove all children except the status node
     Array.from(dropdown.children).forEach(function (child) {
       if (child !== dropdownStatus) {
         dropdown.removeChild(child);
@@ -48,10 +47,91 @@
     });
   }
 
+  /* ── Scholar scrape UI ── */
+
+  function renderScholarPrompt() {
+    clearDropdownItems();
+    setDropdownStatus('');
+
+    var wrapper = document.createElement('div');
+    wrapper.id = 'scholar-prompt';
+    wrapper.style.padding = '0.75rem 1rem';
+
+    wrapper.innerHTML =
+      '<div style="color:#8b8fb8;font-size:0.85rem;margin-bottom:0.5rem;">' +
+        'Author not found. Enter a Google Scholar ID to scrape:' +
+      '</div>' +
+      '<div style="display:flex;gap:0.5rem;">' +
+        '<input id="scholar-id-input" type="text" placeholder="e.g. nFTM_YIAAAAJ"' +
+          ' style="flex:1;padding:0.5rem 0.7rem;background:#0a0e27;border:1px solid #1e2a4a;' +
+          'border-radius:6px;color:#ffffff;font-size:0.9rem;outline:none;" />' +
+        '<button id="scholar-scrape-btn"' +
+          ' style="padding:0.5rem 1rem;background:#0096ff;border:none;border-radius:6px;' +
+          'color:#ffffff;font-size:0.85rem;font-weight:600;cursor:pointer;">Scrape</button>' +
+      '</div>' +
+      '<div id="scholar-scrape-status" style="margin-top:0.4rem;font-size:0.82rem;color:#8b8fb8;"></div>';
+
+    dropdown.appendChild(wrapper);
+
+    var scholarInput = document.getElementById('scholar-id-input');
+    var scrapeBtn    = document.getElementById('scholar-scrape-btn');
+
+    scrapeBtn.addEventListener('click', function () {
+      var scholarId = scholarInput.value.trim();
+      if (!scholarId) return;
+      runScholarScrape(scholarId);
+    });
+
+    scholarInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        var scholarId = scholarInput.value.trim();
+        if (!scholarId) return;
+        runScholarScrape(scholarId);
+      }
+    });
+  }
+
+  function runScholarScrape(scholarId) {
+    var statusEl = document.getElementById('scholar-scrape-status');
+    var scrapeBtn = document.getElementById('scholar-scrape-btn');
+    var scholarInput = document.getElementById('scholar-id-input');
+
+    statusEl.textContent = 'Scraping Google Scholar… This may take a minute.';
+    statusEl.style.color = '#8b8fb8';
+    scrapeBtn.disabled = true;
+    scholarInput.disabled = true;
+
+    fetch('/api/authors/scholar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scholar_id: scholarId }),
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.json().then(function (body) {
+            throw new Error(body.detail || 'Scrape failed (' + res.status + ')');
+          }).catch(function (err) {
+            if (err.message) throw err;
+            throw new Error('Scrape failed (' + res.status + ')');
+          });
+        }
+        return res.json();
+      })
+      .then(function (author) {
+        selectAuthor(author);
+      })
+      .catch(function (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        statusEl.style.color = '#ff3366';
+        scrapeBtn.disabled = false;
+        scholarInput.disabled = false;
+      });
+  }
+
   /* ── Search ── */
 
   function onSearchInput() {
-    const query = searchInput.value.trim();
+    var query = searchInput.value.trim();
 
     clearTimeout(searchTimer);
     clearDropdownItems();
@@ -81,17 +161,17 @@
         clearDropdownItems();
 
         if (authors.length === 0) {
-          setDropdownStatus('No results found.');
+          renderScholarPrompt();
           return;
         }
 
         setDropdownStatus('');
 
         authors.forEach(function (author) {
-          const item = document.createElement('div');
+          var item = document.createElement('div');
           item.className = 'dropdown-item';
 
-          const scoreRounded = (author.author_score || 0).toFixed(2);
+          var scoreRounded = (author.author_score || 0).toFixed(2);
           item.innerHTML =
             '<span class="item-score">' + escapeHtml(scoreRounded) + '</span>' +
             '<div class="item-name">' + escapeHtml(author.name) + '</div>' +
@@ -127,8 +207,8 @@
   }
 
   function renderAuthorCard(author) {
-    const scoreRounded = (author.author_score || 0).toFixed(2);
-    const fieldTags = (author.fields || []).map(function (f) {
+    var scoreRounded = (author.author_score || 0).toFixed(2);
+    var fieldTags = (author.fields || []).map(function (f) {
       return '<span class="field-tag">' + escapeHtml(f) + '</span>';
     }).join('');
 
@@ -160,7 +240,7 @@
     }
 
     fields.forEach(function (field) {
-      const container = document.createElement('div');
+      var container = document.createElement('div');
       container.className = 'plot-container';
       container.id = 'plot-' + encodeURIComponent(field);
 
@@ -179,8 +259,8 @@
   }
 
   function fetchPlot(authorId, field) {
-    const imgWrapperId  = 'plot-img-' + encodeURIComponent(field);
-    const statsId       = 'plot-stats-' + encodeURIComponent(field);
+    var imgWrapperId = 'plot-img-' + encodeURIComponent(field);
+    var statsId      = 'plot-stats-' + encodeURIComponent(field);
 
     fetch('/api/authors/' + encodeURIComponent(authorId) + '/plot/' + encodeURIComponent(field))
       .then(function (res) {
@@ -194,27 +274,25 @@
         return res.json();
       })
       .then(function (data) {
-        const imgWrapper = document.getElementById(imgWrapperId);
-        const statsEl    = document.getElementById(statsId);
+        var imgWrapper = document.getElementById(imgWrapperId);
+        var statsEl    = document.getElementById(statsId);
 
         if (!imgWrapper) return;
 
-        // Render stats
         if (statsEl) {
           statsEl.innerHTML =
             '<span class="plot-stat">Percentile: <span>' + escapeHtml(data.percentile) + '</span></span>' +
             '<span class="plot-stat">Group size: <span>' + escapeHtml(data.comparison_group_size) + '</span></span>';
         }
 
-        // Render image
-        const img = document.createElement('img');
+        var img = document.createElement('img');
         img.src = 'data:image/png;base64,' + data.plot_base64;
         img.alt = field + ' score distribution';
         imgWrapper.innerHTML = '';
         imgWrapper.appendChild(img);
       })
       .catch(function (err) {
-        const imgWrapper = document.getElementById(imgWrapperId);
+        var imgWrapper = document.getElementById(imgWrapperId);
         if (imgWrapper) {
           imgWrapper.innerHTML = '<div class="plot-error">' + escapeHtml(err.message) + '</div>';
         }
@@ -225,15 +303,13 @@
 
   searchInput.addEventListener('input', onSearchInput);
 
-  // Close dropdown when clicking outside
   document.addEventListener('click', function (e) {
-    const searchWrapper = searchInput.parentElement;
+    var searchWrapper = searchInput.parentElement;
     if (!searchWrapper.contains(e.target)) {
       hideDropdown();
     }
   });
 
-  // Re-open dropdown on focus if there are items
   searchInput.addEventListener('focus', function () {
     if (searchInput.value.trim().length >= 2 && dropdown.children.length > 1) {
       showDropdown();
