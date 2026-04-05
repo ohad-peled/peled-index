@@ -127,3 +127,36 @@ def run_pipeline(input_json_path, output_json_path, scimago_file_path):
 		results.append(score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, current_year))
 	save_results_json(output_json_path, results)
 	return results
+
+def infer_start_year_from_papers(papers):
+	'Infer career start from the earliest publication year.'
+	paper_years = [parse_year(p.get('year')) for p in papers]
+	paper_years = [y for y in paper_years if y is not None]
+	if not paper_years:
+		return None
+	return min(paper_years)
+
+
+def score_author_from_scholar(author_name, institution, titles, scimago_sjr_by_issn, scimago_fields_by_issn, current_year):
+	'Build and score an author from a list of paper titles scraped from Google Scholar.'
+	papers = build_papers_from_titles(titles, author_name, scimago_sjr_by_issn, scimago_fields_by_issn)
+	start_year = infer_start_year_from_papers(papers)
+	if start_year is None:
+		author_score = 0.0
+	else:
+		author_score = compute_author_score(papers, current_year, start_year)
+	author_fields = sorted({
+		field
+		for paper in papers
+		for field in find_journal_fields(paper.pop('journal_issns', []), scimago_fields_by_issn)
+	})
+	return {
+		'name': author_name,
+		'institution': institution,
+		'start_year': start_year,
+		'author_score': author_score,
+		'total_papers': len(papers),
+		'fields': author_fields,
+		'papers': papers,
+	}
+
