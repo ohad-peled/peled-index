@@ -79,8 +79,17 @@ def compute_paper_score(paper, current_year, non_first_author_weight):
 	return authorship_weight * citations_per_year
 
 
-def compute_author_score(papers, current_year, start_year, non_first_author_weight=0.1):
-	'Compute the author score normalised by career length from PhD start year.'
+def infer_start_year_from_papers(papers):
+	'Infer career start from earliest publication year.'
+	paper_years = [parse_year(p.get('year')) for p in papers]
+	paper_years = [y for y in paper_years if y is not None]
+	if not paper_years:
+		return None
+	return min(paper_years)
+
+
+def compute_author_score(papers, current_year, start_year, infer_start_year, non_first_author_weight=0.1):
+	'Compute the author score normalised by career length.'
 	paper_scores = [
 		compute_paper_score(paper, current_year, non_first_author_weight)
 		for paper in papers
@@ -88,18 +97,25 @@ def compute_author_score(papers, current_year, start_year, non_first_author_weig
 	paper_scores = [score for score in paper_scores if score is not None]
 	if not paper_scores:
 		return 0.0
+	if infer_start_year:
+		start_year = infer_start_year_from_papers(papers)
+	if start_year is None:
+		return 0.0
 	active_years = current_year - start_year + 1
 	if active_years <= 0:
 		return 0.0
 	return round(sum(paper_scores) / active_years, 6)
 
 
-def score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, current_year):
+def score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, current_year, infer_start_year):
 	'Build and score one author entry from the input JSON.'
 	author_name = author_entry['name']
-	start_year = parse_year(author_entry['start_year'])
+	if infer_start_year:
+		start_year = None
+	else:
+		start_year = parse_year(author_entry.get('start_year'))
 	papers = build_papers_from_titles(author_entry['publications'], author_name, scimago_sjr_by_issn, scimago_fields_by_issn)
-	author_score = compute_author_score(papers, current_year, start_year)
+	author_score = compute_author_score(papers, current_year, start_year, infer_start_year)
 	author_fields = sorted({
 		field
 		for paper in papers
@@ -116,7 +132,7 @@ def score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, curr
 	}
 
 
-def run_pipeline(input_json_path, output_json_path, scimago_file_path):
+def run_pipeline(input_json_path, output_json_path, scimago_file_path, infer_start_year=False):
 	'Run the Crossref and SCImago pipeline for all authors in the input file.'
 	scimago_sjr_by_issn, scimago_fields_by_issn = load_scimago_data_by_issn(scimago_file_path)
 	author_list = load_author_list(input_json_path)
@@ -124,6 +140,6 @@ def run_pipeline(input_json_path, output_json_path, scimago_file_path):
 	results = []
 	for author_index, author_entry in enumerate(author_list, start=1):
 		print(f'Processing author {author_index}: {author_entry["name"]}')
-		results.append(score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, current_year))
+		results.append(score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, current_year, infer_start_year))
 	save_results_json(output_json_path, results)
 	return results
