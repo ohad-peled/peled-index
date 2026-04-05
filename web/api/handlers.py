@@ -6,6 +6,8 @@ from core.plots import (
     compute_percentile,
     plot_score_distribution_for_field,
 )
+from core.scholar import fetch_all_scholar_papers
+from core.pipeline import score_author_from_scholar
 from web.utils import make_author_id
 
 
@@ -29,6 +31,35 @@ def search_authors(query: str, index: Dict[str, dict]) -> List[dict]:
 def get_author(author_id: str, index: Dict[str, dict]) -> Optional[dict]:
     """Return the full author entry for the given author ID, or None if not found."""
     return index.get(author_id)
+
+
+def scrape_and_score_scholar_author(
+    scholar_id: str,
+    serpapi_key: str,
+    scimago_sjr_by_issn: dict,
+    scimago_fields_by_issn: dict,
+    current_year: int,
+    results: List[dict],
+    index: Dict[str, dict],
+) -> Optional[dict]:
+    """Scrape a Google Scholar profile, score the author, and add to the in-memory index."""
+    author_name, institution, titles = fetch_all_scholar_papers(serpapi_key, scholar_id)
+    if not titles:
+        return None
+    author_id = make_author_id(author_name, institution)
+    if author_id in index:
+        return {'author_id': author_id, **index[author_id]}
+    entry = score_author_from_scholar(
+        author_name,
+        institution,
+        titles,
+        scimago_sjr_by_issn,
+        scimago_fields_by_issn,
+        current_year,
+    )
+    results.append(entry)
+    index[author_id] = entry
+    return {'author_id': author_id, **entry}
 
 
 def generate_plot(
