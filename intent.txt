@@ -35,3 +35,102 @@ Variable names are meaningful, readable and not shortened. Do not assign cryptic
 Do not use variations of a variable name in different parts of the code for the same data. Always use the exact same variable name for the same data.
 Do not try to catch all exceptions and then simply print errors and rethrow or create silent errors. This is an anti-pattern. Only catch exceptions in very specific cases where we need the code to continue running (for instance, if we run sandboxed code and want to test if it works).
 Do not rush to reimplement something that might already be implemented. Do not rush to create new basic module functions. Code writing should be very careful for any low-level functionality.
+
+PROJECT SUMMARY (peled-index)
+=============================
+
+Purpose:
+Peled Index is an author-level academic scoring system. It takes a list of researchers (with their publication titles and PhD start years), enriches each paper via the Crossref API and SCImago journal data, computes a per-author score normalized by career length, and serves the results through a web UI where users can search authors and view percentile-rank plots within scientific fields.
+
+Architecture:
+The project has three layers: core (scoring pipeline), web (FastAPI serving layer), and data (pre-computed results JSON + SCImago CSV). There are also root-level duplicates of the core files (pipeline.py, helpers.py, main.py, plots.py) which are identical to those under core/ — the root copies are legacy and the web layer imports from core/.
+
+File-by-file breakdown:
+
+  core/helpers.py (~12 KB)
+    The low-level workhorse module. Responsibilities:
+    - Crossref API interaction: fetches candidate records for a title+author query, with retry/backoff on 429s. Uses a persistent requests.Session.
+    - Text normalization: heavy normalization pipeline (ftfy, html unescape, unicode NFKD, ASCII folding, lowercasing, punctuation removal) used for title and author name matching.
+    - ISSN normalization and SCImago CSV parsing: loads scimagojr2024.csv (semicolon-delimited) into two dicts keyed by normalized ISSN — one for SJR values, one for mapped high-level fields.
+    - SCImago area-to-field mapping: a hardcoded dict (SCIMAGO_AREA_TO_FIELD) that collapses ~25 SCImago subject areas into 4 broad fields: Life Sciences, Physics and Chemistry, Computer Science and Engineering, Social Sciences and Humanities.
+    - Crossref record extraction: functions to extract title, ISSNs, year, venue, citations, first author name, preprint detection (by type/subtype + platform name matching against biorxiv/medrxiv/chemrxiv/arxiv).
+    - Match selection logic (find_crossref_match): for a given title, iterates Crossref hits, requires exact normalized title match + author name match + DOI present, prefers journal-article type, falls back to first non-article match.
+    - Paper deduplication by title.
+    - JSON I/O for author list input and results output.
+
+  core/pipeline.py (~4 KB)
+    Orchestration and scoring logic. Responsibilities:
+    - build_papers_from_titles: for one author, fetches all papers concurrently (ThreadPoolExecutor, 8 workers) via find_crossref_match, enriches each with SJR and field data.
+    - Parsing helpers: parse_year, parse_int, parse_float — safe converters returning None or 0 on failure.
+    - compute_paper_score: per-paper score formula:
+        * Excludes papers with no year, preprints, or future years.
+        * citations_per_year = citations / paper_age (where paper_age = current_year - paper_year + 1).
+        * authorship_weight = 1.0 if first author, else 0.1 (non_first_author_weight).
+        * If journal SJR available: score = authorship_weight * (0.3 * citations_per_year + 0.7 * journal_sjr).
+        * If no SJR: score = authorship_weight * citations_per_year.
+    - compute_author_score: sums paper scores, divides by active_years (current_year - start_year + 1). Returns 0.0 if no valid papers or non-positive active years.
+      KNOWN ISSUE: if start_year is None (unparseable), active_years computation crashes (None arithmetic). This is a planned refactor target — adding an infer_start_year boolean flag to run_pipeline that, when True, infers start_year from the earliest publication year for ALL authors consistently, ignoring the input start_year field entirely.
+    - score_author: ties together paper building, scoring, and field aggregation for one author. Pops journal_issns from paper dicts during field extraction (side effect).
+    - run_pipeline: top-level entry point. Loads SCImago data, iterates authors sequentially (prints progress), scores each, saves results JSON.
+
+  core/plots.py (~5.8 KB)
+    Visualization module. Generates per-field score distribution histograms as Base64-encoded PNG images (matplotlib). Key functions:
+    - filter_eligible_authors_by_field: filters to authors with score > 0 and matching field.
+    - compute_percentile: fraction of scores below the candidate.
+    - plot_score_distribution_for_field: dark-themed histogram, dual-tone bins (darker left of candidate), dashed red candidate line with percentile annotation. Returns Base64 string.
+    - generate_plots_for_author: orchestrates plot generation for all fields of a given author.
+
+  core/main.py (~2.9 KB)
+    CLI entrypoint. Currently hardcoded to local Windows paths. Calls run_pipeline. Contains commented-out utility functions (zero-publication summary, single-author test).
+
+  web/app.py (~1.3 KB)
+    FastAPI application. On startup (lifespan), loads the pre-computed results JSON (data/phd_2010-2025_isr_res.json) into memory and builds an index dict keyed by author ID. Mounts static files and API router.
+
+  web/utils.py (~0.2 KB)
+    Single utility: make_author_id — MD5 hash of "name_institution" string.
+
+  web/api/routes.py (~1.2 KB)
+    Three FastAPI endpoints under /api/authors/:
+    - GET /search?query=... — substring search by name.
+    - GET /{author_id} — full author detail.
+    - GET /{author_id}/plot/{field} — generates and returns a Base64 plot.
+
+  web/api/handlers.py (~2.5 KB)
+    Business logic behind routes. search_authors returns summary dicts. get_author returns full entry. generate_plot calls into core/plots.py functions to produce the histogram.
+
+  web/static/index.html + app.js (~13 KB combined)
+    Single-page frontend. Dark-themed UI ("Ranki" / "Peled Index"). Features:
+    - Live search with debounced dropdown (250ms), shows author name + institution + score + paper count.
+    - On author selection: renders a card (name, institution, score, papers, field tags) and fetches/renders a plot for each field.
+    - Vanilla JS, no frameworks. Variable names are underscore-delimited per style guide, function names camelCase.
+
+  data/phd_2010-2025_isr_res.json (~14.7 MB)
+    Pre-computed pipeline output. Large JSON array of scored author entries, used by the web layer at startup.
+
+  scimagojr2024.csv (~10.7 MB)
+    SCImago Journal Rank 2024 dataset. Semicolon-delimited. Key columns used: Issn, SJR, Areas.
+
+Data flow:
+  1. Input JSON (array of {name, start_year, institution, publications}) is loaded.
+  2. For each author, each publication title is queried against Crossref (concurrently, 8 threads).
+  3. Best Crossref match is selected (exact title + author name match, prefers journal-article).
+  4. Paper metadata is enriched with SJR and fields via ISSN lookup against SCImago data.
+  5. Paper scores are computed, summed, and normalized by career length to produce author_score.
+  6. Results JSON is saved. The web layer loads this JSON and serves it via API + static frontend.
+
+Scoring formula summary:
+  paper_score = authorship_weight * (0.3 * (citations / paper_age) + 0.7 * journal_sjr)
+    - Falls back to authorship_weight * (citations / paper_age) when SJR is unavailable.
+    - authorship_weight: 1.0 for first author, 0.1 otherwise.
+    - paper_age = current_year - paper_year + 1.
+    - Preprints and papers with missing/future years are excluded.
+  author_score = sum(paper_scores) / active_years
+    - active_years = current_year - start_year + 1.
+
+Key design decisions:
+  - Functional programming paradigm. No classes. Stateless functions. Minimal mutability.
+  - Microservice-style module separation: helpers is the extensive low-level interface, pipeline is orchestration, plots is visualization, web is serving.
+  - Crossref matching is strict: requires exact normalized title match AND author name match AND DOI.
+  - SCImago areas are collapsed into 4 broad fields for cross-discipline comparison.
+  - The web layer is read-only — it serves pre-computed results. Pipeline runs are offline/batch.
+  - Root-level files (pipeline.py, helpers.py, main.py, plots.py) are legacy duplicates of core/. The web layer imports from core/.
