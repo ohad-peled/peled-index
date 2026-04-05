@@ -58,18 +58,18 @@
     wrapper.style.padding = '0.75rem 1rem';
 
     wrapper.innerHTML =
-      '<div style="color:#8b8fb8;font-size:0.85rem;margin-bottom:0.5rem;">' +
+      '<div style="color:#94a3b8;font-size:0.85rem;margin-bottom:0.5rem;">' +
         'Author not found. Enter a Google Scholar ID to scrape:' +
       '</div>' +
       '<div style="display:flex;gap:0.5rem;">' +
         '<input id="scholar-id-input" type="text" placeholder="e.g. nFTM_YIAAAAJ"' +
-          ' style="flex:1;padding:0.5rem 0.7rem;background:#0a0e27;border:1px solid #1e2a4a;' +
+          ' style="flex:1;padding:0.5rem 0.7rem;background:#0f172a;border:1px solid #334155;' +
           'border-radius:6px;color:#ffffff;font-size:0.9rem;outline:none;" />' +
         '<button id="scholar-scrape-btn"' +
           ' style="padding:0.5rem 1rem;background:#0096ff;border:none;border-radius:6px;' +
-          'color:#ffffff;font-size:0.85rem;font-weight:600;cursor:pointer;">Scrape</button>' +
+          'color:#ffffff;font-size:0.85rem;font-weight:600;cursor:pointer;">Go</button>' +
       '</div>' +
-      '<div id="scholar-scrape-status" style="margin-top:0.4rem;font-size:0.82rem;color:#8b8fb8;"></div>';
+      '<div id="scholar-scrape-status" style="margin-top:0.4rem;font-size:0.82rem;color:#94a3b8;"></div>';
 
     dropdown.appendChild(wrapper);
 
@@ -97,7 +97,7 @@
     var scholarInput = document.getElementById('scholar-id-input');
 
     statusEl.textContent = 'Scraping Google Scholar… This may take a minute.';
-    statusEl.style.color = '#8b8fb8';
+    statusEl.style.color = '#94a3b8';
     scrapeBtn.disabled = true;
     scholarInput.disabled = true;
 
