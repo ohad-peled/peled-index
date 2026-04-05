@@ -1,6 +1,6 @@
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from helpers import (
+from core.helpers import (
 	deduplicate_papers,
 	find_crossref_match,
 	find_journal_fields,
