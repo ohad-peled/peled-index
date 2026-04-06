@@ -190,12 +190,20 @@ function renderScholarCandidates(candidates, container) {
 			'padding:0.5rem 0.7rem;margin-top:0.35rem;background:#0f172a;border:1px solid #334155;' +
 			'border-radius:6px;cursor:pointer;transition:background 0.15s;';
 
+		var details = escapeHtml(candidate.affiliations || '');
+		if (candidate.email) {
+			details += (details ? ' · ' : '') + escapeHtml(candidate.email);
+		}
+		if (candidate.cited_by) {
+			details += (details ? ' · ' : '') + 'Cited by ' + candidate.cited_by;
+		}
+
 		item.innerHTML =
 			'<div style="color:#ffffff;font-size:0.88rem;font-weight:600;">' +
 				escapeHtml(candidate.name) +
 			'</div>' +
 			'<div style="color:#64748b;font-size:0.76rem;margin-top:2px;">' +
-				escapeHtml(candidate.sample_paper_title || '') +
+				details +
 			'</div>';
 
 		item.addEventListener('mouseenter', function () {
@@ -205,10 +213,23 @@ function renderScholarCandidates(candidates, container) {
 			item.style.background = '#0f172a';
 		});
 		item.addEventListener('click', function () {
-			container.innerHTML = '';
 			var status_element = document.getElementById('scholar-search-status');
-			status_element.textContent = 'Scraping profile...';
-			status_element.style.color = '#94a3b8';
+			status_element.textContent = '';
+
+			container.innerHTML =
+				'<div style="padding:0.75rem 0.7rem;margin-top:0.35rem;background:#1e293b;' +
+				'border:1px solid #0096ff;border-radius:6px;">' +
+					'<div style="color:#ffffff;font-size:0.88rem;font-weight:600;">' +
+						escapeHtml(candidate.name) +
+					'</div>' +
+					'<div style="color:#64748b;font-size:0.76rem;margin-top:2px;">' +
+						escapeHtml(candidate.affiliations || '') +
+					'</div>' +
+					'<div style="color:#0096ff;font-size:0.8rem;margin-top:0.35rem;">' +
+						'⏳ Scraping Scholar profile… This may take a moment.' +
+					'</div>' +
+				'</div>';
+
 			runScholarScrape(candidate.author_id);
 		});
 
