@@ -79,3 +79,37 @@ def fetch_all_scholar_papers(serpapi_key, scholar_id):
 			break
 		start += SCHOLAR_PAGE_SIZE
 	return author_name, institution, deduplicate_titles(all_titles)
+
+
+def search_scholar_by_name(serpapi_key, author_name):
+	'''Search Google Scholar for author name candidates.
+	Returns a list of dicts with author_id, name, and sample_paper_title.
+	'''
+	params = {
+		'engine': 'google_scholar',
+		'q': 'author:"' + author_name + '"',
+		'api_key': serpapi_key,
+		'num': 20,
+	}
+	response = requests.get(SERPAPI_URL, params=params, timeout=60)
+	response.raise_for_status()
+	data = response.json()
+	return _extract_unique_candidates(data.get('organic_results', []))
+
+
+def _extract_unique_candidates(organic_results):
+	'''Extract unique author candidates from organic search results.'''
+	candidates_by_id = {}
+	for result in organic_results:
+		paper_title = result.get('title', '')
+		for author in result.get('publication_info', {}).get('authors', []):
+			author_id = author.get('author_id')
+			if not author_id:
+				continue
+			if author_id not in candidates_by_id:
+				candidates_by_id[author_id] = {
+					'author_id': author_id,
+					'name': author.get('name', ''),
+					'sample_paper_title': paper_title,
+				}
+	return list(candidates_by_id.values())
