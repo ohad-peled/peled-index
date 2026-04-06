@@ -336,6 +336,7 @@
       fields.forEach(function (field) {
         var tag = document.createElement('span');
         tag.className = 'field-tag' + (field === current_active ? ' active' : '');
+        tag.textContent = field;
         if (field !== current_active) {
           tag.addEventListener('click', function () {
             set_active_field(field);
