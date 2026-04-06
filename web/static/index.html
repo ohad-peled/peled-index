@@ -374,6 +374,41 @@
       white-space: nowrap;
     }
 
+    /* ── Footer ── */
+    .site-footer {
+      margin-top: 3rem;
+      padding: 1.5rem 1rem;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+    }
+
+    .footer-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: #64748b;
+      text-decoration: none;
+      font-size: 0.82rem;
+      transition: color 0.2s;
+    }
+
+    .footer-link:hover {
+      color: #00d9ff;
+    }
+
+    .footer-link svg {
+      flex-shrink: 0;
+    }
+
+    .footer-divider {
+      color: #293548;
+      font-size: 0.9rem;
+    }
+
   </style>
 </head>
 <body>
@@ -400,5 +435,32 @@
   <div id="papers-section"></div>
 
   <script src="app.js"></script>
+
+  <footer class="site-footer">
+    <a class="footer-link" href="https://github.com/ohad-peled/peled-index/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 1C5.925 1 1 5.925 1 12c0 4.86 3.152 8.983 7.523 10.437.55.101.75-.239.75-.53 0-.262-.01-1.135-.015-2.065-3.06.664-3.705-1.312-3.705-1.312-.5-1.27-1.221-1.608-1.221-1.608-.999-.683.076-.669.076-.669 1.104.078 1.685 1.133 1.685 1.133.98 1.68 2.572 1.195 3.2.913.099-.71.384-1.195.698-1.47-2.441-.278-5.007-1.222-5.007-5.438 0-1.201.428-2.183 1.132-2.952-.113-.278-.491-1.396.108-2.91 0 0 .923-.296 3.023 1.127A10.536 10.536 0 0 1 12 6.32c.935.004 1.876.126 2.754.37 2.098-1.423 3.02-1.127 3.02-1.127.6 1.514.222 2.632.109 2.91.705.769 1.13 1.751 1.13 2.952 0 4.226-2.57 5.157-5.018 5.428.395.34.747 1.01.747 2.035 0 1.47-.013 2.655-.013 3.016 0 .293.198.636.754.528C19.85 20.979 23 16.859 23 12c0-6.075-4.925-11-11-11z"/>
+      </svg>
+      MIT License
+    </a>
+
+    <span class="footer-divider">|</span>
+
+    <a class="footer-link" href="https://www.linkedin.com/in/ohad-peled-a99181176/" target="_blank" rel="noopener noreferrer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M20.447 20.452H17.21v-5.569c0-1.327-.024-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.987V9h3.112v1.561h.044c.433-.82 1.49-1.684 3.066-1.684 3.279 0 3.883 2.157 3.883 4.964v6.611zM5.337 7.433a1.807 1.807 0 1 1 0-3.614 1.807 1.807 0 0 1 0 3.614zM6.959 20.452H3.713V9h3.246v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+      </svg>
+      Created by Ohad Peled
+    </a>
+
+    <span class="footer-divider">|</span>
+
+    <a class="footer-link" href="https://github.com/ohad-peled/peled-index" target="_blank" rel="noopener noreferrer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 1C5.925 1 1 5.925 1 12c0 4.86 3.152 8.983 7.523 10.437.55.101.75-.239.75-.53 0-.262-.01-1.135-.015-2.065-3.06.664-3.705-1.312-3.705-1.312-.5-1.27-1.221-1.608-1.221-1.608-.999-.683.076-.669.076-.669 1.104.078 1.685 1.133 1.685 1.133.98 1.68 2.572 1.195 3.2.913.099-.71.384-1.195.698-1.47-2.441-.278-5.007-1.222-5.007-5.438 0-1.201.428-2.183 1.132-2.952-.113-.278-.491-1.396.108-2.91 0 0 .923-.296 3.023 1.127A10.536 10.536 0 0 1 12 6.32c.935.004 1.876.126 2.754.37 2.098-1.423 3.02-1.127 3.02-1.127.6 1.514.222 2.632.109 2.91.705.769 1.13 1.751 1.13 2.952 0 4.226-2.57 5.157-5.018 5.428.395.34.747 1.01.747 2.035 0 1.47-.013 2.655-.013 3.016 0 .293.198.636.754.528C19.85 20.979 23 16.859 23 12c0-6.075-4.925-11-11-11z"/>
+      </svg>
+      View on GitHub
+    </a>
+  </footer>
 </body>
 </html>
