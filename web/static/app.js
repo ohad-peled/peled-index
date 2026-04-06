@@ -235,13 +235,13 @@
       return;
     }
 
-    var primary_field = fields[0];
+    var active_field = fields[0];
     var container = document.createElement('div');
     container.className = 'plot-container';
 
     container.innerHTML =
       '<div class="plot-meta">' +
-        '<span class="plot-field-title">' + escapeHtml(primary_field) + '</span>' +
+        '<span class="plot-field-title">' + escapeHtml(active_field) + '</span>' +
         '<div class="plot-stats" id="plot-stats"></div>' +
       '</div>' +
       '<div class="plot-img-wrapper" id="plot-img">' +
@@ -251,13 +251,15 @@
     plotsSection.appendChild(container);
 
     if (fields.length > 1) {
-      renderFieldSwitcher(container, author_id, fields);
+      renderFieldSwitcher(container, author_id, fields, active_field, function (chosen_field) {
+        active_field = chosen_field;
+      });
     }
 
     fetchPlot(author_id);
   }
 
-  function renderFieldSwitcher(container, author_id, fields) {
+  function renderFieldSwitcher(container, author_id, fields, active_field, set_active_field) {
     var switcher = document.createElement('div');
     switcher.id = 'field-switcher';
 
@@ -268,22 +270,28 @@
     var alternatives = document.createElement('div');
     alternatives.className = 'field-switch-options';
 
-    fields.slice(1).forEach(function (field) {
-      var tag = document.createElement('span');
-      tag.className = 'field-tag';
-      tag.textContent = field;
-      tag.addEventListener('click', function () {
-        var title_el = container.querySelector('.plot-field-title');
-        title_el.textContent = field;
-        var img_wrapper = document.getElementById('plot-img');
-        img_wrapper.innerHTML = '<div class="plot-loading">Generating plot…</div>';
-        var stats_el = document.getElementById('plot-stats');
-        if (stats_el) stats_el.innerHTML = '';
-        alternatives.classList.remove('visible');
-        fetchPlot(author_id, field);
+    function rebuildAlternatives(current_active) {
+      alternatives.innerHTML = '';
+      fields.forEach(function (field) {
+        if (field === current_active) return;
+        var tag = document.createElement('span');
+        tag.className = 'field-tag';
+        tag.textContent = field;
+        tag.addEventListener('click', function () {
+          set_active_field(field);
+          container.querySelector('.plot-field-title').textContent = field;
+          document.getElementById('plot-img').innerHTML = '<div class="plot-loading">Generating plot…</div>';
+          var stats_el = document.getElementById('plot-stats');
+          if (stats_el) stats_el.innerHTML = '';
+          alternatives.classList.remove('visible');
+          rebuildAlternatives(field);
+          fetchPlot(author_id, field);
+        });
+        alternatives.appendChild(tag);
       });
-      alternatives.appendChild(tag);
-    });
+    }
+
+    rebuildAlternatives(active_field);
 
     toggle.addEventListener('click', function () {
       alternatives.classList.toggle('visible');
