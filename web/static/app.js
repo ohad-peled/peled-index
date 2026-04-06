@@ -9,6 +9,7 @@
   const authorCard     = document.getElementById('author-card');
   const authorInfo     = document.getElementById('author-info');
   const plotsSection   = document.getElementById('plots-section');
+  const papersSection  = document.getElementById('papers-section');
 
   let searchTimer = null;
   let currentAuthorId = null;
@@ -198,13 +199,25 @@
 
   function selectAuthor(author) {
     hideDropdown();
-    searchInput.value = author.name;
-    currentAuthorId   = author.author_id;
-    currentFields     = author.fields || [];
+    searchInput.value   = author.name;
+    currentAuthorId     = author.author_id;
+    currentFields       = author.fields || [];
 
     renderAuthorCard(author);
     renderPlots(author.author_id, author.fields || []);
+    papersSection.innerHTML = '';
+
+    fetch('/api/authors/' + encodeURIComponent(author.author_id))
+      .then(function (res) {
+        if (!res.ok) throw new Error('Failed to load papers (' + res.status + ')');
+        return res.json();
+      })
+      .then(function (full_author) {
+        renderPaperCards(full_author.papers || []);
+      });
   }
+
+
 
   function renderAuthorCard(author) {
     var score_rounded = (author.author_score || 0).toFixed(2);
@@ -225,6 +238,48 @@
 
     authorCard.classList.add('visible');
   }
+
+
+  function renderPaperCards(papers) {
+  papersSection.innerHTML = '';
+  if (!papers || papers.length === 0) return;
+
+  var grid = document.createElement('div');
+  grid.className = 'papers-grid';
+
+  papers.forEach(function (paper) {
+    var card = document.createElement('div');
+    card.className = 'paper-card';
+
+    var title_html = paper.paper_url
+      ? '<div class="paper-card-title"><a href="' + escapeHtml(paper.paper_url) +
+        '" target="_blank" rel="noopener noreferrer">' + escapeHtml(paper.title) + '</a></div>'
+      : '<div class="paper-card-title-plain">' + escapeHtml(paper.title) + '</div>';
+
+    var first_author_badge = paper.is_first_author
+      ? '<span class="paper-card-first-author">1st author</span>'
+      : '';
+
+    var year   = paper.year   != null ? String(paper.year)   : '—';
+    var cites  = paper.citations != null ? String(paper.citations) : '0';
+
+    card.innerHTML =
+      title_html +
+      '<div class="paper-card-venue">' + escapeHtml(paper.venue_raw || '—') + '</div>' +
+      '<div class="paper-card-footer">' +
+        '<div class="paper-card-citations">Citations: <span>' + escapeHtml(cites) + '</span></div>' +
+        '<div class="paper-card-meta">' +
+          '<span class="paper-card-year">' + escapeHtml(year) + '</span>' +
+          first_author_badge +
+        '</div>' +
+      '</div>';
+
+    grid.appendChild(card);
+  });
+
+  papersSection.appendChild(grid);
+}
+
 
 
   /* ── Plots ── */
