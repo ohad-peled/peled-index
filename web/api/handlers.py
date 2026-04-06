@@ -87,8 +87,6 @@ def generate_plot(
 
     if field is None:
         field = candidate_fields[0]
-    elif field not in candidate_fields:
-        return {'error': f"Field '{field}' not found for {entry['name']}."}
 
     eligible = filter_eligible_authors_by_field(results, field)
     scores = extract_author_scores(eligible)

@@ -15,6 +15,13 @@
   let currentAuthorId = null;
   let currentFields   = [];
 
+    var ALL_FIELDS = [
+    'Computer Science and Engineering',
+    'Life Sciences',
+    'Physics and Chemistry',
+    'Social Sciences and Humanities'
+  ];
+
   /* ── Utility ── */
 
   function escapeHtml(str) {
@@ -305,14 +312,13 @@
 
     plotsSection.appendChild(container);
 
-    if (fields.length > 1) {
-      renderFieldSwitcher(container, author_id, fields, active_field, function (chosen_field) {
-        active_field = chosen_field;
-      });
-    }
+    renderFieldSwitcher(container, author_id, ALL_FIELDS, active_field, function (chosen_field) {
+      active_field = chosen_field;
+    });
 
     fetchPlot(author_id);
   }
+
 
   function renderFieldSwitcher(container, author_id, fields, active_field, set_active_field) {
     var switcher = document.createElement('div');
@@ -328,23 +334,25 @@
     function rebuildAlternatives(current_active) {
       alternatives.innerHTML = '';
       fields.forEach(function (field) {
-        if (field === current_active) return;
         var tag = document.createElement('span');
-        tag.className = 'field-tag';
-        tag.textContent = field;
-        tag.addEventListener('click', function () {
-          set_active_field(field);
-          container.querySelector('.plot-field-title').textContent = field;
-          document.getElementById('plot-img').innerHTML = '<div class="plot-loading">Generating plot…</div>';
-          var stats_el = document.getElementById('plot-stats');
-          if (stats_el) stats_el.innerHTML = '';
-          alternatives.classList.remove('visible');
-          rebuildAlternatives(field);
-          fetchPlot(author_id, field);
-        });
+        tag.className = 'field-tag' + (field === current_active ? ' active' : '');
+        if (field !== current_active) {
+          tag.addEventListener('click', function () {
+            set_active_field(field);
+            container.querySelector('.plot-field-title').textContent = field;
+            document.getElementById('plot-img').innerHTML = '<div class="plot-loading">Generating plot…</div>';
+            var stats_el = document.getElementById('plot-stats');
+            if (stats_el) stats_el.innerHTML = '';
+            alternatives.classList.remove('visible');
+            rebuildAlternatives(field);
+            fetchPlot(author_id, field);
+          });
+        }
         alternatives.appendChild(tag);
       });
     }
+
+
 
     rebuildAlternatives(active_field);
 
