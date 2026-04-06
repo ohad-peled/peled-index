@@ -249,12 +249,40 @@
       font-size: 0.9rem;
     }
 
+/* AFTER: */
     .plot-error {
       text-align: center;
       padding: 1.5rem;
       color: #ff3366;
       font-size: 0.85rem;
     }
+
+    #field-switcher {
+      margin-top: 0.75rem;
+    }
+
+    .field-switch-toggle {
+      color: #7a7d9a;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .field-switch-toggle:hover {
+      color: #00d9ff;
+    }
+
+    .field-switch-options {
+      display: none;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+
+    .field-switch-options.visible {
+      display: flex;
+    }
+
 
     /* ── Scrollbar ── */
     ::-webkit-scrollbar { width: 6px; }

@@ -46,12 +46,13 @@ def author_detail(author_id: str, request: Request):
 
 
 @router.get('/{author_id}/plot')
-def author_plot(author_id: str, request: Request):
-    """Generate and return a plot for an author in their primary field as Base64 PNG."""
-    result = generate_plot(author_id, request.app.state.results, request.app.state.index)
+def author_plot(author_id: str, request: Request, field: str = Query(default=None)):
+    """Generate and return a plot for an author, optionally in a specific field."""
+    result = generate_plot(author_id, request.app.state.results, request.app.state.index, field)
     if result is None:
         raise HTTPException(status_code=404, detail='Author not found')
     if 'error' in result:
         raise HTTPException(status_code=422, detail=result['error'])
     return result
+
 

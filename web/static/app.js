@@ -207,10 +207,7 @@
   }
 
   function renderAuthorCard(author) {
-    var scoreRounded = (author.author_score || 0).toFixed(2);
-    var fieldTags = (author.fields || []).map(function (f) {
-      return '<span class="field-tag">' + escapeHtml(f) + '</span>';
-    }).join('');
+    var score_rounded = (author.author_score || 0).toFixed(2);
 
     authorInfo.innerHTML =
       '<h2>' + escapeHtml(author.name) + '</h2>' +
@@ -218,35 +215,33 @@
       '<div class="stats-row">' +
         '<div class="stat-item">' +
           '<span class="stat-label">Author Score</span>' +
-          '<span class="stat-value">' + escapeHtml(scoreRounded) + '</span>' +
+          '<span class="stat-value">' + escapeHtml(score_rounded) + '</span>' +
         '</div>' +
         '<div class="stat-item">' +
           '<span class="stat-label">Total Papers</span>' +
           '<span class="stat-value">' + escapeHtml(author.total_papers || 0) + '</span>' +
         '</div>' +
-      '</div>' +
-      (fieldTags ? '<div class="fields-list">' + fieldTags + '</div>' : '');
+      '</div>';
 
     authorCard.classList.add('visible');
   }
 
-  /* ── Plots ── */
 
-// AFTER:
-  function renderPlots(authorId, fields) {
+  /* ── Plots ── */
+  function renderPlots(author_id, fields) {
     plotsSection.innerHTML = '';
 
     if (!fields || fields.length === 0) {
       return;
     }
 
-    var primaryField = fields[0];
+    var primary_field = fields[0];
     var container = document.createElement('div');
     container.className = 'plot-container';
 
     container.innerHTML =
       '<div class="plot-meta">' +
-        '<span class="plot-field-title">' + escapeHtml(primaryField) + '</span>' +
+        '<span class="plot-field-title">' + escapeHtml(primary_field) + '</span>' +
         '<div class="plot-stats" id="plot-stats"></div>' +
       '</div>' +
       '<div class="plot-img-wrapper" id="plot-img">' +
@@ -254,11 +249,58 @@
       '</div>';
 
     plotsSection.appendChild(container);
-    fetchPlot(authorId);
+
+    if (fields.length > 1) {
+      renderFieldSwitcher(container, author_id, fields);
+    }
+
+    fetchPlot(author_id);
   }
 
-  function fetchPlot(authorId) {
-    fetch('/api/authors/' + encodeURIComponent(authorId) + '/plot')
+  function renderFieldSwitcher(container, author_id, fields) {
+    var switcher = document.createElement('div');
+    switcher.id = 'field-switcher';
+
+    var toggle = document.createElement('span');
+    toggle.className = 'field-switch-toggle';
+    toggle.textContent = 'Not your field?';
+
+    var alternatives = document.createElement('div');
+    alternatives.className = 'field-switch-options';
+
+    fields.slice(1).forEach(function (field) {
+      var tag = document.createElement('span');
+      tag.className = 'field-tag';
+      tag.textContent = field;
+      tag.addEventListener('click', function () {
+        var title_el = container.querySelector('.plot-field-title');
+        title_el.textContent = field;
+        var img_wrapper = document.getElementById('plot-img');
+        img_wrapper.innerHTML = '<div class="plot-loading">Generating plot…</div>';
+        var stats_el = document.getElementById('plot-stats');
+        if (stats_el) stats_el.innerHTML = '';
+        alternatives.classList.remove('visible');
+        fetchPlot(author_id, field);
+      });
+      alternatives.appendChild(tag);
+    });
+
+    toggle.addEventListener('click', function () {
+      alternatives.classList.toggle('visible');
+    });
+
+    switcher.appendChild(toggle);
+    switcher.appendChild(alternatives);
+    container.appendChild(switcher);
+  }
+
+  function fetchPlot(author_id, field) {
+    var plot_url = '/api/authors/' + encodeURIComponent(author_id) + '/plot';
+    if (field) {
+      plot_url += '?field=' + encodeURIComponent(field);
+    }
+
+    fetch(plot_url)
       .then(function (res) {
         if (!res.ok) {
           return res.json().then(function (body) {
@@ -270,13 +312,13 @@
         return res.json();
       })
       .then(function (data) {
-        var imgWrapper = document.getElementById('plot-img');
-        var statsEl    = document.getElementById('plot-stats');
+        var img_wrapper = document.getElementById('plot-img');
+        var stats_el    = document.getElementById('plot-stats');
 
-        if (!imgWrapper) return;
+        if (!img_wrapper) return;
 
-        if (statsEl) {
-          statsEl.innerHTML =
+        if (stats_el) {
+          stats_el.innerHTML =
             '<span class="plot-stat">Percentile: <span>' + escapeHtml(data.percentile) + '</span></span>' +
             '<span class="plot-stat">Group size: <span>' + escapeHtml(data.comparison_group_size) + '</span></span>';
         }
@@ -284,16 +326,17 @@
         var img = document.createElement('img');
         img.src = 'data:image/png;base64,' + data.plot_base64;
         img.alt = 'score distribution';
-        imgWrapper.innerHTML = '';
-        imgWrapper.appendChild(img);
+        img_wrapper.innerHTML = '';
+        img_wrapper.appendChild(img);
       })
       .catch(function (err) {
-        var imgWrapper = document.getElementById('plot-img');
-        if (imgWrapper) {
-          imgWrapper.innerHTML = '<div class="plot-error">' + escapeHtml(err.message) + '</div>';
+        var img_wrapper = document.getElementById('plot-img');
+        if (img_wrapper) {
+          img_wrapper.innerHTML = '<div class="plot-error">' + escapeHtml(err.message) + '</div>';
         }
       });
   }
+
 
   /* ── Event listeners ── */
 
