@@ -6,10 +6,14 @@ from core.plots import (
     compute_percentile,
     plot_score_distribution_for_field,
 )
-from core.scholar import fetch_all_scholar_papers
 from core.pipeline import score_author_from_scholar
 from web.utils import make_author_id
 
+from core.scholar import fetch_all_scholar_papers, search_scholar_by_name
+
+def search_scholar_profiles(author_name, serpapi_key):
+	'''Search Google Scholar for author profiles matching a name.'''
+	return search_scholar_by_name(serpapi_key, author_name)
 
 def search_authors(query: str, index: Dict[str, dict]) -> List[dict]:
     """Return authors whose name contains the query string (case-insensitive)."""

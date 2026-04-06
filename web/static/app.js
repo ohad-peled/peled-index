@@ -57,84 +57,164 @@
 
   /* ── Scholar scrape UI ── */
 
-  function renderScholarPrompt() {
-    clearDropdownItems();
-    setDropdownStatus('');
+function renderScholarPrompt() {
+	clearDropdownItems();
+	setDropdownStatus('');
 
-    var wrapper = document.createElement('div');
-    wrapper.id = 'scholar-prompt';
-    wrapper.style.padding = '0.75rem 1rem';
+	var wrapper = document.createElement('div');
+	wrapper.id = 'scholar-prompt';
+	wrapper.style.padding = '0.75rem 1rem';
 
-    wrapper.innerHTML =
-      '<div style="color:#94a3b8;font-size:0.85rem;margin-bottom:0.5rem;">' +
-        'Author not found. Enter a Google Scholar ID to scrape:' +
-      '</div>' +
-      '<div style="display:flex;gap:0.5rem;">' +
-        '<input id="scholar-id-input" type="text" placeholder="e.g. nFTM_YIAAAAJ"' +
-          ' style="flex:1;padding:0.5rem 0.7rem;background:#0f172a;border:1px solid #334155;' +
-          'border-radius:6px;color:#ffffff;font-size:0.9rem;outline:none;" />' +
-        '<button id="scholar-scrape-btn"' +
-          ' style="padding:0.5rem 1rem;background:#0096ff;border:none;border-radius:6px;' +
-          'color:#ffffff;font-size:0.85rem;font-weight:600;cursor:pointer;">Go</button>' +
-      '</div>' +
-      '<div id="scholar-scrape-status" style="margin-top:0.4rem;font-size:0.82rem;color:#94a3b8;"></div>';
+	wrapper.innerHTML =
+		'<div style="color:#94a3b8;font-size:0.85rem;margin-bottom:0.5rem;">' +
+			'Author not found. Search Google Scholar by name:' +
+		'</div>' +
+		'<div style="display:flex;gap:0.5rem;">' +
+			'<input id="scholar-name-input" type="text" placeholder="e.g. John Smith"' +
+				' style="flex:1;padding:0.5rem 0.7rem;background:#0f172a;border:1px solid #334155;' +
+				'border-radius:6px;color:#ffffff;font-size:0.9rem;outline:none;" />' +
+			'<button id="scholar-name-btn"' +
+				' style="padding:0.5rem 1rem;background:#0096ff;border:none;border-radius:6px;' +
+				'color:#ffffff;font-size:0.85rem;font-weight:600;cursor:pointer;">Search</button>' +
+		'</div>' +
+		'<div id="scholar-search-status" style="margin-top:0.4rem;font-size:0.82rem;color:#94a3b8;"></div>' +
+		'<div id="scholar-candidates"></div>' +
+		'<div style="margin-top:0.6rem;">' +
+			'<span id="scholar-id-toggle" style="color:#7a7d9a;font-size:0.78rem;cursor:pointer;">' +
+				'Have a Scholar ID instead?' +
+			'</span>' +
+		'</div>' +
+		'<div id="scholar-id-section" style="display:none;margin-top:0.5rem;">' +
+			'<div style="display:flex;gap:0.5rem;">' +
+				'<input id="scholar-id-input" type="text" placeholder="e.g. nFTM_YIAAAAJ"' +
+					' style="flex:1;padding:0.5rem 0.7rem;background:#0f172a;border:1px solid #334155;' +
+					'border-radius:6px;color:#ffffff;font-size:0.9rem;outline:none;" />' +
+				'<button id="scholar-scrape-btn"' +
+					' style="padding:0.5rem 1rem;background:#0096ff;border:none;border-radius:6px;' +
+					'color:#ffffff;font-size:0.85rem;font-weight:600;cursor:pointer;">Go</button>' +
+			'</div>' +
+			'<div id="scholar-scrape-status" style="margin-top:0.4rem;font-size:0.82rem;color:#94a3b8;"></div>' +
+		'</div>';
 
-    dropdown.appendChild(wrapper);
+	dropdown.appendChild(wrapper);
 
-    var scholarInput = document.getElementById('scholar-id-input');
-    var scrapeBtn    = document.getElementById('scholar-scrape-btn');
+	var scholar_name_input = document.getElementById('scholar-name-input');
+	var scholar_name_btn = document.getElementById('scholar-name-btn');
+	var scholar_id_toggle = document.getElementById('scholar-id-toggle');
+	var scholar_id_section = document.getElementById('scholar-id-section');
 
-    scrapeBtn.addEventListener('click', function () {
-      var scholarId = scholarInput.value.trim();
-      if (!scholarId) return;
-      runScholarScrape(scholarId);
-    });
+	scholar_name_btn.addEventListener('click', function () {
+		var name = scholar_name_input.value.trim();
+		if (name) runScholarNameSearch(name);
+	});
 
-    scholarInput.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') {
-        var scholarId = scholarInput.value.trim();
-        if (!scholarId) return;
-        runScholarScrape(scholarId);
-      }
-    });
-  }
+	scholar_name_input.addEventListener('keydown', function (e) {
+		if (e.key === 'Enter') {
+			var name = scholar_name_input.value.trim();
+			if (name) runScholarNameSearch(name);
+		}
+	});
 
-  function runScholarScrape(scholarId) {
-    var statusEl = document.getElementById('scholar-scrape-status');
-    var scrapeBtn = document.getElementById('scholar-scrape-btn');
-    var scholarInput = document.getElementById('scholar-id-input');
+	scholar_id_toggle.addEventListener('click', function () {
+		var is_hidden = scholar_id_section.style.display === 'none';
+		scholar_id_section.style.display = is_hidden ? 'block' : 'none';
+		scholar_id_toggle.textContent = is_hidden
+			? 'Search by name instead'
+			: 'Have a Scholar ID instead?';
+	});
 
-    statusEl.textContent = 'Scraping Google Scholar… This may take a minute.';
-    statusEl.style.color = '#94a3b8';
-    scrapeBtn.disabled = true;
-    scholarInput.disabled = true;
+	var scholar_id_input = document.getElementById('scholar-id-input');
+	var scholar_scrape_btn = document.getElementById('scholar-scrape-btn');
 
-    fetch('/api/authors/scholar', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scholar_id: scholarId }),
-    })
-      .then(function (res) {
-        if (!res.ok) {
-          return res.json().then(function (body) {
-            throw new Error(body.detail || 'Scrape failed (' + res.status + ')');
-          }).catch(function (err) {
-            if (err.message) throw err;
-            throw new Error('Scrape failed (' + res.status + ')');
-          });
-        }
-        return res.json();
-      })
-      .then(function (author) {
-        selectAuthor(author);
-      })
-      .catch(function (err) {
-        statusEl.textContent = 'Error: ' + err.message;
-        statusEl.style.color = '#ff3366';
-        scrapeBtn.disabled = false;
-        scholarInput.disabled = false;
-      });
-  }
+	scholar_scrape_btn.addEventListener('click', function () {
+		var scholar_id = scholar_id_input.value.trim();
+		if (scholar_id) runScholarScrape(scholar_id);
+	});
+
+	scholar_id_input.addEventListener('keydown', function (e) {
+		if (e.key === 'Enter') {
+			var scholar_id = scholar_id_input.value.trim();
+			if (scholar_id) runScholarScrape(scholar_id);
+		}
+	});
+}
+
+function runScholarNameSearch(author_name) {
+	var status_element = document.getElementById('scholar-search-status');
+	var candidates_element = document.getElementById('scholar-candidates');
+	var name_btn = document.getElementById('scholar-name-btn');
+	var name_input = document.getElementById('scholar-name-input');
+
+	status_element.textContent = 'Searching Google Scholar...';
+	status_element.style.color = '#94a3b8';
+	candidates_element.innerHTML = '';
+	name_btn.disabled = true;
+	name_input.disabled = true;
+
+	fetch('/api/authors/scholar/search?name=' + encodeURIComponent(author_name))
+		.then(function (res) {
+			if (!res.ok) {
+				return res.json().then(function (body) {
+					throw new Error(body.detail || 'Search failed (' + res.status + ')');
+				}).catch(function (err) {
+					if (err.message) throw err;
+					throw new Error('Search failed (' + res.status + ')');
+				});
+			}
+			return res.json();
+		})
+		.then(function (candidates) {
+			name_btn.disabled = false;
+			name_input.disabled = false;
+			if (candidates.length === 1) {
+				status_element.textContent = 'Found profile. Scraping...';
+				runScholarScrape(candidates[0].author_id);
+				return;
+			}
+			status_element.textContent = 'Multiple profiles found. Select yours:';
+			renderScholarCandidates(candidates, candidates_element);
+		})
+		.catch(function (err) {
+			status_element.textContent = 'Error: ' + err.message;
+			status_element.style.color = '#ff3366';
+			name_btn.disabled = false;
+			name_input.disabled = false;
+		});
+}
+
+function renderScholarCandidates(candidates, container) {
+	container.innerHTML = '';
+	candidates.forEach(function (candidate) {
+		var item = document.createElement('div');
+		item.style.cssText =
+			'padding:0.5rem 0.7rem;margin-top:0.35rem;background:#0f172a;border:1px solid #334155;' +
+			'border-radius:6px;cursor:pointer;transition:background 0.15s;';
+
+		item.innerHTML =
+			'<div style="color:#ffffff;font-size:0.88rem;font-weight:600;">' +
+				escapeHtml(candidate.name) +
+			'</div>' +
+			'<div style="color:#64748b;font-size:0.76rem;margin-top:2px;">' +
+				escapeHtml(candidate.sample_paper_title || '') +
+			'</div>';
+
+		item.addEventListener('mouseenter', function () {
+			item.style.background = '#253352';
+		});
+		item.addEventListener('mouseleave', function () {
+			item.style.background = '#0f172a';
+		});
+		item.addEventListener('click', function () {
+			container.innerHTML = '';
+			var status_element = document.getElementById('scholar-search-status');
+			status_element.textContent = 'Scraping profile...';
+			status_element.style.color = '#94a3b8';
+			runScholarScrape(candidate.author_id);
+		});
+
+		container.appendChild(item);
+	});
+}
 
   /* ── Search ── */
 

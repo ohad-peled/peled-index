@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
-
+from web.api.handlers import (
+	get_author, generate_plot, search_authors,
+	scrape_and_score_scholar_author, search_scholar_profiles,
+)
 from web.api.handlers import get_author, generate_plot, search_authors, scrape_and_score_scholar_author
 
 router = APIRouter(prefix='/authors', tags=['authors'])
@@ -9,6 +12,18 @@ router = APIRouter(prefix='/authors', tags=['authors'])
 class ScholarRequest(BaseModel):
     scholar_id: str
 
+
+
+@router.get('/scholar/search')
+def scholar_search(request: Request, name: str = Query(..., min_length=1)):
+	"""Search Google Scholar for author profiles by name."""
+	state = request.app.state
+	if not state.serpapi_key:
+		raise HTTPException(status_code=500, detail='SERPAPI_KEY not configured')
+	candidates = search_scholar_profiles(name, state.serpapi_key)
+	if not candidates:
+		raise HTTPException(status_code=404, detail='No Scholar profiles found for this name')
+	return candidates
 
 @router.get('/search')
 def search(request: Request, query: str = Query(..., min_length=1)):
