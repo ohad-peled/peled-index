@@ -4,7 +4,6 @@ from web.api.handlers import (
 	get_author, generate_plot, search_authors,
 	scrape_and_score_scholar_author, search_scholar_profiles,
 )
-from web.api.handlers import get_author, generate_plot, search_authors, scrape_and_score_scholar_author
 
 router = APIRouter(prefix='/authors', tags=['authors'])
 

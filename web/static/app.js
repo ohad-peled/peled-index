@@ -216,6 +216,57 @@ function renderScholarCandidates(candidates, container) {
 	});
 }
 
+
+function runScholarScrape(scholar_id) {
+	var status_element = document.getElementById('scholar-search-status') ||
+		document.getElementById('scholar-scrape-status');
+
+	if (status_element) {
+		status_element.textContent = 'Scraping Scholar profile…';
+		status_element.style.color = '#94a3b8';
+	}
+
+	fetch('/api/authors/scholar', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ scholar_id: scholar_id }),
+	})
+		.then(function (res) {
+			if (!res.ok) {
+				return res.json().then(function (body) {
+					throw new Error(body.detail || 'Scrape failed (' + res.status + ')');
+				}).catch(function (err) {
+					if (err.message) throw err;
+					throw new Error('Scrape failed (' + res.status + ')');
+				});
+			}
+			return res.json();
+		})
+		.then(function (author) {
+			hideDropdown();
+			searchInput.value = author.name || '';
+			currentAuthorId = author.author_id;
+			currentFields   = author.fields || [];
+			renderAuthorCard(author);
+			renderPlots(author.author_id, author.fields || []);
+			papersSection.innerHTML = '';
+			fetch('/api/authors/' + encodeURIComponent(author.author_id))
+				.then(function (res) {
+					if (!res.ok) throw new Error('Failed to load papers (' + res.status + ')');
+					return res.json();
+				})
+				.then(function (full_author) {
+					renderPaperCards(full_author.papers || []);
+				});
+		})
+		.catch(function (err) {
+			if (status_element) {
+				status_element.textContent = 'Error: ' + err.message;
+				status_element.style.color = '#ff3366';
+			}
+		});
+}
+
   /* ── Search ── */
 
   function onSearchInput() {
