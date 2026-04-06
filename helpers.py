@@ -332,3 +332,12 @@ def find_journal_fields(journal_issns, scimago_fields_by_issn):
         if journal_issn in scimago_fields_by_issn:
             return scimago_fields_by_issn[journal_issn]
     return []
+
+
+def rank_fields_by_paper_count(papers, scimago_fields_by_issn):
+	'Return fields sorted by how many papers belong to each, descending.'
+	field_paper_counts = {}
+	for paper in papers:
+		for field in find_journal_fields(paper.get('journal_issns', []), scimago_fields_by_issn):
+			field_paper_counts[field] = field_paper_counts.get(field, 0) + 1
+	return sorted(field_paper_counts, key=field_paper_counts.get, reverse=True)

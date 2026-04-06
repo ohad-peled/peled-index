@@ -1,12 +1,13 @@
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from core.helpers import (
+from helpers import (
 	deduplicate_papers,
 	find_crossref_match,
 	find_journal_fields,
 	find_journal_sjr,
 	load_author_list,
 	load_scimago_data_by_issn,
+	rank_fields_by_paper_count,
 	save_results_json,
 )
 
@@ -99,12 +100,10 @@ def score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, curr
 	author_name = author_entry['name']
 	start_year = parse_year(author_entry['start_year'])
 	papers = build_papers_from_titles(author_entry['publications'], author_name, scimago_sjr_by_issn, scimago_fields_by_issn)
-	author_score = compute_author_score(papers, current_year, start_year)
-	author_fields = sorted({
-		field
-		for paper in papers
-		for field in find_journal_fields(paper.pop('journal_issns', []), scimago_fields_by_issn)
-	})
+	author_score = compute_author_score(papers, current_year, start_year, infer_start_year)
+	author_fields = rank_fields_by_paper_count(papers, scimago_fields_by_issn)
+	for paper in papers:
+		paper.pop('journal_issns', None)
 	return {
 		'name': author_name,
 		'institution': author_entry.get('institution', ''),
