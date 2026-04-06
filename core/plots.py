@@ -122,9 +122,9 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
     ax.set_xlabel('Author Score', color='#cccccc', fontsize=20, labelpad=10)
     ax.set_ylabel('Number of Authors', color='#cccccc', fontsize=20, labelpad=10)
     ax.set_title(
-        f'{candidate_name} - {field}\n',
+        f'{candidate_name}',
         color='#ffffff',
-        fontsize=30,
+        fontsize=26,
         fontweight='bold',
         pad=16
     )

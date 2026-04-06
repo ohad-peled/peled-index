@@ -64,12 +64,12 @@ def scrape_and_score_scholar_author(
 
 def generate_plot(
     author_id: str,
-    field: str,
     results: List[dict],
     index: Dict[str, dict],
 ) -> Optional[dict]:
     """
-    Generate a Base64-encoded plot for the given author in the specified field.
+    Generate a Base64-encoded plot for the given author in their primary field
+    (the first entry in fields, which is already sorted by paper count descending).
 
     Returns a dict with keys: plot_base64, percentile, comparison_group_size.
     Returns None if the author is not found.
@@ -88,8 +88,7 @@ def generate_plot(
     if not candidate_fields:
         return {'error': f"{entry['name']} has no fields."}
 
-    if field not in candidate_fields:
-        return {'error': f"Field '{field}' not found for {entry['name']}."}
+    field = candidate_fields[0]
 
     eligible = filter_eligible_authors_by_field(results, field)
     scores = extract_author_scores(eligible)
@@ -111,3 +110,4 @@ def generate_plot(
         'percentile': percentile,
         'comparison_group_size': len(scores),
     }
+

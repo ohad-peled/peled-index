@@ -232,6 +232,7 @@
 
   /* ── Plots ── */
 
+// AFTER:
   function renderPlots(authorId, fields) {
     plotsSection.innerHTML = '';
 
@@ -239,30 +240,25 @@
       return;
     }
 
-    fields.forEach(function (field) {
-      var container = document.createElement('div');
-      container.className = 'plot-container';
-      container.id = 'plot-' + encodeURIComponent(field);
+    var primaryField = fields[0];
+    var container = document.createElement('div');
+    container.className = 'plot-container';
 
-      container.innerHTML =
-        '<div class="plot-meta">' +
-          '<span class="plot-field-title">' + escapeHtml(field) + '</span>' +
-          '<div class="plot-stats" id="plot-stats-' + encodeURIComponent(field) + '"></div>' +
-        '</div>' +
-        '<div class="plot-img-wrapper" id="plot-img-' + encodeURIComponent(field) + '">' +
-          '<div class="plot-loading">Generating plot…</div>' +
-        '</div>';
+    container.innerHTML =
+      '<div class="plot-meta">' +
+        '<span class="plot-field-title">' + escapeHtml(primaryField) + '</span>' +
+        '<div class="plot-stats" id="plot-stats"></div>' +
+      '</div>' +
+      '<div class="plot-img-wrapper" id="plot-img">' +
+        '<div class="plot-loading">Generating plot…</div>' +
+      '</div>';
 
-      plotsSection.appendChild(container);
-      fetchPlot(authorId, field);
-    });
+    plotsSection.appendChild(container);
+    fetchPlot(authorId);
   }
 
-  function fetchPlot(authorId, field) {
-    var imgWrapperId = 'plot-img-' + encodeURIComponent(field);
-    var statsId      = 'plot-stats-' + encodeURIComponent(field);
-
-    fetch('/api/authors/' + encodeURIComponent(authorId) + '/plot/' + encodeURIComponent(field))
+  function fetchPlot(authorId) {
+    fetch('/api/authors/' + encodeURIComponent(authorId) + '/plot')
       .then(function (res) {
         if (!res.ok) {
           return res.json().then(function (body) {
@@ -274,8 +270,8 @@
         return res.json();
       })
       .then(function (data) {
-        var imgWrapper = document.getElementById(imgWrapperId);
-        var statsEl    = document.getElementById(statsId);
+        var imgWrapper = document.getElementById('plot-img');
+        var statsEl    = document.getElementById('plot-stats');
 
         if (!imgWrapper) return;
 
@@ -287,12 +283,12 @@
 
         var img = document.createElement('img');
         img.src = 'data:image/png;base64,' + data.plot_base64;
-        img.alt = field + ' score distribution';
+        img.alt = 'score distribution';
         imgWrapper.innerHTML = '';
         imgWrapper.appendChild(img);
       })
       .catch(function (err) {
-        var imgWrapper = document.getElementById(imgWrapperId);
+        var imgWrapper = document.getElementById('plot-img');
         if (imgWrapper) {
           imgWrapper.innerHTML = '<div class="plot-error">' + escapeHtml(err.message) + '</div>';
         }
