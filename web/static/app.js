@@ -456,7 +456,6 @@ function runScholarScrape(scholar_id) {
     container.innerHTML =
       '<div class="plot-meta">' +
         '<span class="plot-field-title">' + escapeHtml(active_field) + '</span>' +
-        '<div class="plot-stats" id="plot-stats"></div>' +
       '</div>' +
       '<div class="plot-img-wrapper" id="plot-img">' +
         '<div class="plot-loading">Generating plot…</div>' +
@@ -489,18 +488,16 @@ function runScholarScrape(scholar_id) {
         var tag = document.createElement('span');
         tag.className = 'field-tag' + (field === current_active ? ' active' : '');
         tag.textContent = field;
-        if (field !== current_active) {
-          tag.addEventListener('click', function () {
-            set_active_field(field);
-            container.querySelector('.plot-field-title').textContent = field;
-            document.getElementById('plot-img').innerHTML = '<div class="plot-loading">Generating plot…</div>';
-            var stats_el = document.getElementById('plot-stats');
-            if (stats_el) stats_el.innerHTML = '';
-            alternatives.classList.remove('visible');
-            rebuildAlternatives(field);
-            fetchPlot(author_id, field);
-          });
-        }
+	      if (field !== current_active) {
+	        tag.addEventListener('click', function () {
+	          set_active_field(field);
+	          container.querySelector('.plot-field-title').textContent = field;
+	          document.getElementById('plot-img').innerHTML = '<div class="plot-loading">Generating plot…</div>';
+	          alternatives.classList.remove('visible');
+	          rebuildAlternatives(field);
+	          fetchPlot(author_id, field);
+	        });
+	      }
         alternatives.appendChild(tag);
       });
     }
@@ -537,15 +534,8 @@ function runScholarScrape(scholar_id) {
       })
       .then(function (data) {
         var img_wrapper = document.getElementById('plot-img');
-        var stats_el    = document.getElementById('plot-stats');
 
         if (!img_wrapper) return;
-
-        if (stats_el) {
-          stats_el.innerHTML =
-            '<span class="plot-stat">Percentile: <span>' + escapeHtml(data.percentile) + '</span></span>' +
-            '<span class="plot-stat">Group size: <span>' + escapeHtml(data.comparison_group_size) + '</span></span>';
-        }
 
         var img = document.createElement('img');
         img.src = 'data:image/png;base64,' + data.plot_base64;
