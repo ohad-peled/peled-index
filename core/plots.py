@@ -74,15 +74,15 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
     if candidate_score is not None:
         for patch, left_edge in zip(patches, bins[:-1]):
             if left_edge < candidate_score:
-                patch.set_facecolor('#2a5fa8')
+                patch.set_facecolor('#be915c')
             else:
-                patch.set_facecolor('#4a90d9')
+                patch.set_facecolor('#eeb674')
 
     # Candidate vertical line
     if candidate_score is not None:
         ax.axvline(
             candidate_score,
-            color='#e8475f',
+            color='#ee7974',
             linewidth=2,
             linestyle='--',
             zorder=5
@@ -104,7 +104,7 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
             candidate_score + text_x_offset,
             ax.get_ylim()[1] * 0.92,
             annotation_text,
-            color='#e8475f',
+            color='#ee7974',
             fontsize=14,
             fontweight='bold',
             ha=ha,
@@ -112,8 +112,8 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
             zorder=6,
             bbox=dict(
                 boxstyle='round,pad=0.4',
-                facecolor='#1e1e2e',
-                edgecolor='#e8475f',
+                facecolor='#0f1117',
+                edgecolor='#ee7974',
                 alpha=0.85
             )
         )
