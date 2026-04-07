@@ -1,4 +1,5 @@
 from datetime import datetime
+from math import log1p
 from concurrent.futures import ThreadPoolExecutor
 from helpers import (
 	deduplicate_papers,
@@ -103,12 +104,20 @@ def compute_author_score(papers, current_year, start_year, non_first_author_weig
 	return round(sum(paper_scores) / active_years, 6)
 
 
+def compute_compressed_author_score(author_score):
+	'Apply monotonic compression to reduce tail influence.'
+	if author_score <= 0:
+		return 0.0
+	return round(log1p(author_score), 6)
+
+
 def score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, current_year):
 	'Build and score one author entry from the input JSON.'
 	author_name = author_entry['name']
 	start_year = parse_year(author_entry.get('start_year'))
 	papers = build_papers_from_titles(author_entry['publications'], author_name, scimago_sjr_by_issn, scimago_fields_by_issn)
 	author_score = compute_author_score(papers, current_year, start_year)
+	compressed_author_score = compute_compressed_author_score(author_score)
 	author_fields = rank_fields_by_paper_count(papers, scimago_fields_by_issn)
 	for paper in papers:
 		paper.pop('journal_issns', None)
@@ -117,6 +126,7 @@ def score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, curr
 		'institution': author_entry.get('institution', ''),
 		'start_year': start_year,
 		'author_score': author_score,
+		'author_score_log1p': compressed_author_score,
 		'total_papers': len(papers),
 		'fields': author_fields,
 		'papers': papers,
@@ -128,6 +138,7 @@ def score_author_from_scholar(author_name, institution, titles, scimago_sjr_by_i
 	papers = build_papers_from_titles(titles, author_name, scimago_sjr_by_issn, scimago_fields_by_issn)
 	start_year = infer_start_year_from_papers(papers)
 	author_score = compute_author_score(papers, current_year, start_year)
+	compressed_author_score = compute_compressed_author_score(author_score)
 	author_fields = rank_fields_by_paper_count(papers, scimago_fields_by_issn)
 	for paper in papers:
 		paper.pop('journal_issns', None)
@@ -136,6 +147,7 @@ def score_author_from_scholar(author_name, institution, titles, scimago_sjr_by_i
 		'institution': institution,
 		'start_year': start_year,
 		'author_score': author_score,
+		'author_score_log1p': compressed_author_score,
 		'total_papers': len(papers),
 		'fields': author_fields,
 		'papers': papers,
