@@ -5,8 +5,8 @@ import matplotlib.patches as mpatches
 from matplotlib.ticker import FuncFormatter
 
 
-RESULTS_JSON_PATH = 'C:\\Users\\mukid\\PycharmProjects\\metric\\out\\phd_2010-2025_isr_res.json'
-CANDIDATE_NAME = 'Jotham Suez'
+RESULTS_JSON_PATH = 'C:\\Users\\mukid\\PycharmProjects\\metric\\out\\phd_2010-2025_isr_noyear.json'
+CANDIDATE_NAME = 'Ohad Peled'
 
 
 def load_results(results_json_path):
