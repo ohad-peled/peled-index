@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ranki</title>
   <style>
+    :root {
+      --accent-color: #f4cea1;
+      --accent-color-muted-bg: #3b2f23;
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
@@ -51,7 +55,7 @@
     }
 
     #search-input:focus {
-      border-color: #00d9ff;
+      border-color: var(--accent-color);
     }
 
     #search-input::placeholder { color: #7a7d9a; }
@@ -98,7 +102,7 @@
 
     .dropdown-item .item-score {
       float: right;
-      color: #00d9ff;
+      color: var(--accent-color);
       font-weight: 700;
       font-size: 0.9rem;
     }
@@ -160,7 +164,7 @@
     }
 
     .stat-value {
-      color: #00d9ff;
+      color: var(--accent-color);
       font-size: 1.1rem;
       font-weight: 700;
     }
@@ -184,8 +188,8 @@
     }
 
     .field-tag:hover, .field-tag.active {
-      background: #0096ff;
-      border-color: #00d9ff;
+      background: var(--accent-color-muted-bg);
+      border-color: var(--accent-color);
       color: #ffffff;
     }
 
@@ -253,7 +257,7 @@
     }
 
     .field-switch-toggle:hover {
-      color: #00d9ff;
+      color: var(--accent-color);
     }
 
     .field-switch-options {
@@ -297,7 +301,7 @@
     }
 
     .paper-card-title a {
-      color: #00d9ff;
+      color: var(--accent-color);
       font-size: 0.88rem;
       font-weight: 600;
       text-decoration: none;
@@ -349,9 +353,9 @@
     }
 
     .paper-card-first-author {
-      background: #0f3460;
-      border: 1px solid #0096ff;
-      color: #00d9ff;
+      background: var(--accent-color-muted-bg);
+      border: 1px solid var(--accent-color);
+      color: var(--accent-color);
       font-size: 0.68rem;
       font-weight: 600;
       padding: 0.1rem 0.45rem;
@@ -382,7 +386,7 @@
     }
 
     .footer-link:hover {
-      color: #00d9ff;
+      color: var(--accent-color);
     }
 
     .footer-link svg {
