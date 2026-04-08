@@ -1,7 +1,7 @@
 from datetime import datetime
 from math import log1p
 from concurrent.futures import ThreadPoolExecutor
-from helpers import (
+from core.helpers import (
 	deduplicate_papers,
 	find_crossref_match,
 	find_journal_fields,
