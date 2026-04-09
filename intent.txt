@@ -134,3 +134,33 @@ Key design decisions:
   - SCImago areas are collapsed into 4 broad fields for cross-discipline comparison.
   - The web layer is read-only — it serves pre-computed results. Pipeline runs are offline/batch.
   - Root-level files (pipeline.py, helpers.py, main.py, plots.py) are legacy duplicates of core/. The web layer imports from core/.
+
+output format:
+[
+  {
+    "name": <string>,
+    "institution": <string>,
+    "start_year": <int | null>,
+    "author_score": <float>,
+    "author_score_log1p": <float>,
+    "total_papers": <int>,
+    "fields": [
+      {
+        "field": <string>,
+        "count": <int>
+      }
+    ],
+    "papers": [
+      {
+        "title": <string>,
+        "year": <int | null>,
+        "venue_raw": <string>,
+        "citations": <int>,
+        "paper_url": <string | null>,
+        "journal_sjr": <float | null>,
+        "is_first_author": <bool>,
+        "is_preprint": <bool>
+      }
+    ]
+  }
+]
