@@ -1,5 +1,6 @@
 import csv
 import html
+from difflib import SequenceMatcher
 import json
 import re
 import time
@@ -13,7 +14,6 @@ _session = requests.Session()
 _session.headers.update({'User-Agent': 'PeledIndex/1.0 (mailto:your@email.com)'})
 
 CROSSREF_URL = 'https://api.crossref.org/works'
-CROSSREF_ROWS = 5
 PREPRINT_PLATFORM_NAMES = {'biorxiv', 'medrxiv', 'chemrxiv', 'arxiv'}
 PREPRINT_PUBLICATION_TYPES = {'posted-content', 'preprint'}
 PREPRINT_SUBTYPES = {'preprint'}
@@ -48,12 +48,12 @@ SCIMAGO_AREA_TO_FIELD = {
     'Social Sciences':                                  'Social Sciences and Humanities',
 }
 
-def fetch_crossref_hits(title, author_name):
-	'Fetch Crossref candidate records for one paper.'
+def _fetch_crossref_rows(title, author_name, rows):
+	'Fetch a specific number of Crossref candidate records for one paper.'
 	params = {
 		'query.title': title,
 		'query.author': author_name,
-		'rows': CROSSREF_ROWS,
+		'rows': rows,
 	}
 	for attempt in range(5):
 		response = _session.get(CROSSREF_URL, params=params, timeout=60)
@@ -76,6 +76,14 @@ def normalize_text(text_value):
 	text_value = text_value.lower().strip()
 	text_value = re.sub(r'[^\w\s]', ' ', text_value)
 	return ' '.join(text_value.split())
+
+TITLE_MATCH_THRESHOLD = 0.9
+
+def titles_match(title_a, title_b):
+	'Return whether two titles are similar enough to be considered a match.'
+	norm_a = normalize_text(title_a)
+	norm_b = normalize_text(title_b)
+	return SequenceMatcher(None, norm_a, norm_b).ratio() >= TITLE_MATCH_THRESHOLD
 
 
 def normalize_issn(issn_value):
@@ -315,17 +323,14 @@ def build_match_data(crossref_hit, author_name):
 	citations = extract_crossref_citations(crossref_hit)
 	return build_doi_url(doi_value), journal_issns, is_first_author, is_preprint, year, venue, citations
 
-
-def find_crossref_match(title, author_name):
-	'Return the preferred Crossref match for one paper.'
-	normalized_title = normalize_text(title)
-	crossref_hits = fetch_crossref_hits(title, author_name)
-	fallback_match = ('', [], '', False, None, '', 0)
+def _try_match_hits(crossref_hits, title, author_name):
+	'Return the best match from a list of Crossref hits, or None.'
+	fallback_match = None
 	for crossref_hit in crossref_hits:
 		crossref_title = extract_crossref_title(crossref_hit)
 		doi_value = crossref_hit.get('DOI')
 		publication_type = crossref_hit.get('type', '')
-		if normalize_text(crossref_title) != normalized_title:
+		if not titles_match(title, crossref_title):
 			continue
 		if not has_author_name_match(author_name, crossref_hit):
 			continue
@@ -334,9 +339,23 @@ def find_crossref_match(title, author_name):
 		match_data = build_match_data(crossref_hit, author_name)
 		if publication_type == 'journal-article':
 			return match_data
-		if not fallback_match[0]:
+		if fallback_match is None:
 			fallback_match = match_data
 	return fallback_match
+
+
+def find_crossref_match(title, author_name):
+	'Return the preferred Crossref match for one paper. Try top-1 first, then next 3.'
+	no_match = ('', [], '', False, None, '', 0)
+	first_hit = _fetch_crossref_rows(title, author_name, 1)
+	result = _try_match_hits(first_hit, title, author_name)
+	if result is not None:
+		return result
+	extra_hits = _fetch_crossref_rows(title, author_name, 4)
+	result = _try_match_hits(extra_hits[1:], title, author_name)
+	if result is not None:
+		return result
+	return no_match
 
 
 def find_journal_sjr(journal_issns, scimago_sjr_by_issn):
