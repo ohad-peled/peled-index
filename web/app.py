@@ -3,7 +3,8 @@ import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Dict, List
-
+from fastapi import UploadFile, File
+import shutil
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -12,7 +13,7 @@ from core.helpers import load_scimago_data_by_issn
 from web.api.routes import router
 from web.utils import make_author_id
 
-RESULTS_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'phd_2010-2025_isr_res.json')
+RESULTS_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'phd_isr_res_filtered.json')
 SCIMAGO_CSV_PATH = os.path.join(os.path.dirname(__file__), '..', 'scimagojr2024.csv')
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
@@ -47,8 +48,6 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
-from fastapi import UploadFile, File
-import shutil
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
