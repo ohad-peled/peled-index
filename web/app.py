@@ -18,29 +18,31 @@ SCIMAGO_CSV_PATH = os.path.join(os.path.dirname(__file__), '..', 'scimagojr2024.
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info(f"Looking for file at: {RESULTS_JSON_PATH}")
+    logger.info(f"RESULTS_JSON_PATH set to: {RESULTS_JSON_PATH}")
     logger.info(f"File exists: {os.path.exists(RESULTS_JSON_PATH)}")
 
+    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+    logger.info(
+        f"Files in data directory: {os.listdir(data_dir) if os.path.exists(data_dir) else 'DIR DOES NOT EXIST'}")
+
     if os.path.exists(RESULTS_JSON_PATH):
-        logger.info("Loading results JSON...")
-        with open(RESULTS_JSON_PATH, encoding='utf-8') as f:
-            results = json.load(f)
-            app.state.results = results
-            app.state.index = _build_index(results)
-            app.state.scimago_sjr_by_issn, app.state.scimago_fields_by_issn = load_scimago_data_by_issn(
-                SCIMAGO_CSV_PATH)
-            app.state.current_year = datetime.now().year
-            app.state.serpapi_key = os.environ.get('SERPAPI_KEY', '')
-            logger.info(f"Loaded {len(results)} author records")
+    # ... load code
     else:
-        logger.error(f"File not found at {RESULTS_JSON_PATH}")
-        logger.info(f"Files in data directory: {os.listdir(os.path.join(os.path.dirname(__file__), '..', 'data'))}")
+        logger.error(f"⚠️  DATA FILE NOT FOUND at {RESULTS_JSON_PATH}")
+        # Initialize empty state to prevent crashes
+        app.state.results = []
+        app.state.index = {}
+        app.state.scimago_sjr_by_issn = {}
+        app.state.scimago_fields_by_issn = {}
+        app.state.current_year = datetime.now().year
+        app.state.serpapi_key = os.environ.get('SERPAPI_KEY', '')
 
     yield
 
