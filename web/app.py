@@ -17,6 +17,32 @@ RESULTS_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'phd_i
 SCIMAGO_CSV_PATH = os.path.join(os.path.dirname(__file__), '..', 'scimagojr2024.csv')
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info(f"Looking for file at: {RESULTS_JSON_PATH}")
+    logger.info(f"File exists: {os.path.exists(RESULTS_JSON_PATH)}")
+
+    if os.path.exists(RESULTS_JSON_PATH):
+        logger.info("Loading results JSON...")
+        with open(RESULTS_JSON_PATH, encoding='utf-8') as f:
+            results = json.load(f)
+            app.state.results = results
+            app.state.index = _build_index(results)
+            app.state.scimago_sjr_by_issn, app.state.scimago_fields_by_issn = load_scimago_data_by_issn(
+                SCIMAGO_CSV_PATH)
+            app.state.current_year = datetime.now().year
+            app.state.serpapi_key = os.environ.get('SERPAPI_KEY', '')
+            logger.info(f"Loaded {len(results)} author records")
+    else:
+        logger.error(f"File not found at {RESULTS_JSON_PATH}")
+        logger.info(f"Files in data directory: {os.listdir(os.path.join(os.path.dirname(__file__), '..', 'data'))}")
+
+    yield
 
 def _build_index(results: List[dict]) -> Dict[str, dict]:
     """Build an in-memory lookup dict keyed by author ID."""
