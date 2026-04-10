@@ -17,6 +17,12 @@ RESULTS_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'phd_i
 SCIMAGO_CSV_PATH = os.path.join(os.path.dirname(__file__), '..', 'scimagojr2024.csv')
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    file_path = f"/data/{file.filename}"
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return {"filename": file.filename, "path": file_path}
 
 def _build_index(results: List[dict]) -> Dict[str, dict]:
     """Build an in-memory lookup dict keyed by author ID."""
@@ -49,12 +55,6 @@ app.add_middleware(
 )
 
 
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    file_path = f"/data/{file.filename}"
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return {"filename": file.filename, "path": file_path}
 
 app.include_router(router, prefix='/api')
 
