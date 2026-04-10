@@ -173,13 +173,33 @@ def extract_crossref_author_name_parts(crossref_hit):
 	return author_name_parts
 
 
+def extract_crossref_author_full_names(crossref_hit):
+	'Extract normalized full names for Crossref authors.'
+	author_full_names = []
+	for author in crossref_hit.get('author') or []:
+		given_name = author.get('given', '')
+		family_name = author.get('family', '')
+		full_name = ' '.join(part for part in [given_name, family_name] if part).strip()
+		if full_name:
+			author_full_names.append(normalize_text(full_name))
+	return author_full_names
+
+
 def has_author_name_match(author_name, crossref_hit):
-	'Return whether the query author matches by first or last name.'
+	'Return whether the query author matches a Crossref author.'
+	normalized_author_name = normalize_text(author_name)
+	if not normalized_author_name:
+		return False
+	if normalized_author_name in extract_crossref_author_full_names(crossref_hit):
+		return True
 	target_first_name, target_last_name = extract_name_parts(author_name)
 	for crossref_first_name, crossref_last_name in extract_crossref_author_name_parts(crossref_hit):
-		if target_first_name and target_first_name == crossref_first_name:
+		if target_first_name and target_last_name:
+			if target_first_name == crossref_first_name and target_last_name == crossref_last_name:
+				return True
+		elif target_last_name and target_last_name == crossref_last_name:
 			return True
-		if target_last_name and target_last_name == crossref_last_name:
+		elif target_first_name and target_first_name == crossref_first_name:
 			return True
 	return False
 
@@ -322,7 +342,6 @@ def _try_match_hits(crossref_hits, title, author_name):
 		if fallback_match is None:
 			fallback_match = match_data
 	return fallback_match
-
 
 
 def find_crossref_match(title, author_name):
