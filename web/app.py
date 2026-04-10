@@ -35,7 +35,8 @@ async def lifespan(app: FastAPI):
             app.state.scimago_sjr_by_issn, app.state.scimago_fields_by_issn = load_scimago_data_by_issn(
                 SCIMAGO_CSV_PATH)
             app.state.current_year = datetime.now().year
-            app.state.serpapi_key = os.environ.get('SERPAPI_KEY', '')    yield
+            app.state.serpapi_key = os.environ.get('SERPAPI_KEY', '')
+            yield
 
 app = FastAPI(lifespan=lifespan)
 
