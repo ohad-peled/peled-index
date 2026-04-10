@@ -47,6 +47,16 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
+from fastapi import UploadFile, File
+import shutil
+
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    file_path = f"/data/{file.filename}"
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    return {"filename": file.filename, "path": file_path}
+
 app.include_router(router, prefix='/api')
 
 app.mount('/', StaticFiles(directory=STATIC_DIR, html=True), name='static')
