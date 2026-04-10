@@ -30,13 +30,13 @@ def _build_index(results: List[dict]) -> Dict[str, dict]:
 async def lifespan(app: FastAPI):
     if os.path.exists(RESULTS_JSON_PATH):
         with open(RESULTS_JSON_PATH, encoding='utf-8') as f:
+            results = json.load(f)
             app.state.results = results
             app.state.index = _build_index(results)
-            app.state.scimago_sjr_by_issn, app.state.scimago_fields_by_issn = load_scimago_data_by_issn(
-                SCIMAGO_CSV_PATH)
+            app.state.scimago_sjr_by_issn, app.state.scimago_fields_by_issn = load_scimago_data_by_issn(SCIMAGO_CSV_PATH)
             app.state.current_year = datetime.now().year
             app.state.serpapi_key = os.environ.get('SERPAPI_KEY', '')
-            yield
+    yield
 
 app = FastAPI(lifespan=lifespan)
 
