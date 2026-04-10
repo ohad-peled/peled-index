@@ -325,6 +325,7 @@ def _try_match_hits(crossref_hits, title, author_name):
 
 
 
+def find_crossref_match(title, author_name):
 	'Return the preferred Crossref match for one paper. Try top-1 first, then next 3.'
 	no_match = ('', [], '', False, None, '', 0)
 	first_hit = _fetch_crossref_rows(title, author_name, 1)
@@ -336,7 +337,6 @@ def _try_match_hits(crossref_hits, title, author_name):
 	if result is not None:
 		return result
 	return no_match
-	return fallback_match
 
 
 def find_journal_sjr(journal_issns, scimago_sjr_by_issn):
