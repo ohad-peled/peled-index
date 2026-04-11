@@ -19,28 +19,6 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
 logger = logging.getLogger(__name__)
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info(f"RESULTS_JSON_PATH set to: {RESULTS_JSON_PATH}")
-    logger.info(f"File exists: {os.path.exists(RESULTS_JSON_PATH)}")
-
-    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
-    logger.info(f"Data dir path: {data_dir}")
-    logger.info(f"Data dir exists: {os.path.exists(data_dir)}")
-
-    if os.path.exists(data_dir):
-        files = os.listdir(data_dir)
-        logger.info(f"Files in data directory: {files}")
-        for f in files:
-            full_path = os.path.join(data_dir, f)
-            size = os.path.getsize(full_path)
-            logger.info(f"  - {f} ({size} bytes)")
-    else:
-        logger.error("Data directory does not exist!")
-
-    # ... rest of code
-
 def _build_index(results: List[dict]) -> Dict[str, dict]:
     """Build an in-memory lookup dict keyed by author ID."""
     index: Dict[str, dict] = {}
@@ -49,35 +27,29 @@ def _build_index(results: List[dict]) -> Dict[str, dict]:
         index[author_id] = entry
     return index
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info(f"RESULTS_JSON_PATH set to: {RESULTS_JSON_PATH}")
-    logger.info(f"File exists: {os.path.exists(RESULTS_JSON_PATH)}")
-
-    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
-    logger.info(
-        f"Files in data directory: {os.listdir(data_dir) if os.path.exists(data_dir) else 'DIR DOES NOT EXIST'}")
-
+    """Initialize app state with data files."""
+    logger.info(f"Loading data from: {RESULTS_JSON_PATH}")
+    
     if os.path.exists(RESULTS_JSON_PATH):
         with open(RESULTS_JSON_PATH, encoding='utf-8') as f:
             results = json.load(f)
         app.state.results = results
         app.state.index = _build_index(results)
         app.state.scimago_sjr_by_issn, app.state.scimago_fields_by_issn = load_scimago_data_by_issn(SCIMAGO_CSV_PATH)
-        app.state.current_year = datetime.now().year
-        app.state.serpapi_key = os.environ.get('SERPAPI_KEY', '')
+        logger.info(f"✓ Loaded {len(results)} results")
     else:
-        logger.error(f"⚠️  DATA FILE NOT FOUND at {RESULTS_JSON_PATH}")
+        logger.error(f"✗ DATA FILE NOT FOUND: {RESULTS_JSON_PATH}")
         app.state.results = []
         app.state.index = {}
         app.state.scimago_sjr_by_issn = {}
         app.state.scimago_fields_by_issn = {}
-        app.state.current_year = datetime.now().year
-        app.state.serpapi_key = os.environ.get('SERPAPI_KEY', '')
-
+    
+    app.state.current_year = datetime.now().year
+    app.state.serpapi_key = os.environ.get('SERPAPI_KEY', '')
+    
     yield
-
 
 app = FastAPI(lifespan=lifespan)
 
@@ -89,5 +61,4 @@ app.add_middleware(
 )
 
 app.include_router(router, prefix='/api')
-
 app.mount('/', StaticFiles(directory=STATIC_DIR, html=True), name='static')
