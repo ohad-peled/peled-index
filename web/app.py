@@ -20,6 +20,27 @@ STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 logger = logging.getLogger(__name__)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info(f"RESULTS_JSON_PATH set to: {RESULTS_JSON_PATH}")
+    logger.info(f"File exists: {os.path.exists(RESULTS_JSON_PATH)}")
+
+    data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+    logger.info(f"Data dir path: {data_dir}")
+    logger.info(f"Data dir exists: {os.path.exists(data_dir)}")
+
+    if os.path.exists(data_dir):
+        files = os.listdir(data_dir)
+        logger.info(f"Files in data directory: {files}")
+        for f in files:
+            full_path = os.path.join(data_dir, f)
+            size = os.path.getsize(full_path)
+            logger.info(f"  - {f} ({size} bytes)")
+    else:
+        logger.error("Data directory does not exist!")
+
+    # ... rest of code
+
 def _build_index(results: List[dict]) -> Dict[str, dict]:
     """Build an in-memory lookup dict keyed by author ID."""
     index: Dict[str, dict] = {}
