@@ -28,27 +28,30 @@ def _build_index(results: List[dict]) -> Dict[str, dict]:
     return index
 
 @asynccontextmanager
+@asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize app state with data files."""
     logger.info(f"Loading data from: {RESULTS_JSON_PATH}")
-    
+    logger.info(f"Loading scimago from: {SCIMAGO_CSV_PATH}")
+
     if os.path.exists(RESULTS_JSON_PATH):
         with open(RESULTS_JSON_PATH, encoding='utf-8') as f:
             results = json.load(f)
         app.state.results = results
         app.state.index = _build_index(results)
         app.state.scimago_sjr_by_issn, app.state.scimago_fields_by_issn = load_scimago_data_by_issn(SCIMAGO_CSV_PATH)
-        logger.info(f"✓ Loaded {len(results)} results")
+        logger.info(f"✓ Loaded {len(results)} results from {RESULTS_JSON_PATH}")
+        logger.info(f"✓ Loaded scimago data from {SCIMAGO_CSV_PATH}")
     else:
         logger.error(f"✗ DATA FILE NOT FOUND: {RESULTS_JSON_PATH}")
         app.state.results = []
         app.state.index = {}
         app.state.scimago_sjr_by_issn = {}
         app.state.scimago_fields_by_issn = {}
-    
+
     app.state.current_year = datetime.now().year
     app.state.serpapi_key = os.environ.get('SERPAPI_KEY', '')
-    
+
     yield
 
 app = FastAPI(lifespan=lifespan)
