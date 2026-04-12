@@ -260,6 +260,20 @@ def extract_first_crossref_author_name(crossref_hit):
 	return normalize_text(full_name)
 
 
+def extract_last_crossref_author_name(crossref_hit):
+	'Extract the normalized full name of the last Crossref author.'
+	authors = crossref_hit.get('author') or []
+	if not authors:
+		return ''
+	last_author = authors[-1]
+	given_name = last_author.get('given', '')
+	family_name = last_author.get('family', '')
+	full_name = ' '.join(part for part in [given_name, family_name] if part).strip()
+	if not full_name:
+		return ''
+	return normalize_text(full_name)
+
+
 def extract_preprint_platform_name(crossref_hit):
 	'Extract a normalized platform identifier from the matched Crossref record.'
 	for institution_data in crossref_hit.get('institution') or []:
@@ -308,8 +322,10 @@ def build_match_data(crossref_hit, author_name):
 	doi_value = crossref_hit.get('DOI')
 	journal_issns = extract_crossref_issns(crossref_hit)
 	first_author_name = extract_first_crossref_author_name(crossref_hit)
+	last_author_name = extract_last_crossref_author_name(crossref_hit)
 	query_first_name, query_last_name = extract_name_parts(author_name)
 	first_author_first_name, first_author_last_name = extract_name_parts(first_author_name)
+	last_author_first_name, last_author_last_name = extract_name_parts(last_author_name)
 	if first_author_name:
 		is_first_author = (
 			(query_first_name and query_first_name == first_author_first_name) or
@@ -317,11 +333,18 @@ def build_match_data(crossref_hit, author_name):
 		)
 	else:
 		is_first_author = ''
+	if last_author_name:
+		is_last_author = (
+			(query_first_name and query_first_name == last_author_first_name) or
+			(query_last_name and query_last_name == last_author_last_name)
+		)
+	else:
+		is_last_author = ''
 	is_preprint = is_crossref_preprint(crossref_hit)
 	year = extract_crossref_year(crossref_hit)
 	venue = extract_crossref_venue(crossref_hit)
 	citations = extract_crossref_citations(crossref_hit)
-	return build_doi_url(doi_value), journal_issns, is_first_author, is_preprint, year, venue, citations
+	return build_doi_url(doi_value), journal_issns, is_first_author, is_last_author, is_preprint, year, venue, citations
 
 def _try_match_hits(crossref_hits, title, author_name):
 	'Return the best match from a list of Crossref hits, or None.'
@@ -346,7 +369,7 @@ def _try_match_hits(crossref_hits, title, author_name):
 
 def find_crossref_match(title, author_name):
 	'Return the preferred Crossref match for one paper. Try top-1 first, then next 3.'
-	no_match = ('', [], '', False, None, '', 0)
+	no_match = ('', [], '', '', False, None, '', 0)
 	first_hit = _fetch_crossref_rows(title, author_name, 1)
 	result = _try_match_hits(first_hit, title, author_name)
 	if result is not None:

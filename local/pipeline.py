@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 def build_papers_from_titles(titles, author_name, scimago_sjr_by_issn, scimago_fields_by_issn, max_workers=8):
 	'Fetch and enrich all papers for one author from Crossref and SCImago.'
 	def process_title(title):
-		paper_url, journal_issns, is_first_author, is_preprint, year, venue, citations = find_crossref_match(title, author_name)
+		paper_url, journal_issns, is_first_author, is_last_author, is_preprint, year, venue, citations = find_crossref_match(title, author_name)
 		return {
 			'title': title,
 			'year': year,
@@ -29,6 +29,7 @@ def build_papers_from_titles(titles, author_name, scimago_sjr_by_issn, scimago_f
 			'journal_sjr': find_journal_sjr(journal_issns, scimago_sjr_by_issn),
 			'journal_issns': journal_issns,
 			'is_first_author': is_first_author,
+			'is_last_author': is_last_author,
 			'is_preprint': is_preprint,
 		}
 	with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -75,7 +76,8 @@ def compute_paper_score(paper, current_year, non_first_author_weight):
 	citations_per_year = citations / paper_age
 	journal_sjr = parse_float(paper.get('journal_sjr'))
 	is_first_author = paper.get('is_first_author')
-	authorship_weight = 1.0 if is_first_author is True or is_first_author == 'True' else non_first_author_weight
+	is_last_author = paper.get('is_last_author')
+	authorship_weight = 1.0 if (is_first_author is True or is_first_author == 'True' or is_last_author is True or is_last_author == 'True') else non_first_author_weight
 	if journal_sjr is not None:
 		return authorship_weight * ((0.3 * citations_per_year) + (0.7 * journal_sjr))
 	return authorship_weight * citations_per_year
