@@ -3,6 +3,18 @@
 (function () {
   'use strict';
 
+  /* ── Startup: log data sources to console ── */
+  fetch('/api/startup-info')
+    .then(function (res) { return res.json(); })
+    .then(function (info) {
+      console.log('[Peled Index] Data sources:');
+      console.log('  Results JSON:', info.results_json);
+      console.log('  Scimago CSV: ', info.scimago_csv);
+    })
+    .catch(function (err) {
+      console.warn('[Peled Index] Could not load startup info:', err);
+    });
+
   const searchInput    = document.getElementById('search-input');
   const dropdown       = document.getElementById('dropdown');
   const dropdownStatus = document.getElementById('dropdown-status');
