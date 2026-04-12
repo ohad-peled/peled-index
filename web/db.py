@@ -17,13 +17,19 @@ CREATE TABLE IF NOT EXISTS scholar_results (
 );
 """
 
+_db_available = False
+
+
+def is_db_available():
+    """Return whether the database is configured and reachable."""
+    return _db_available
+
 
 def get_connection_params():
     """Parse DATABASE_URL into connection params for psycopg2."""
     database_url = os.environ.get('DATABASE_URL', '')
     if not database_url:
-        raise RuntimeError('DATABASE_URL environment variable not set')
-    # Heroku uses postgres:// but psycopg2 requires postgresql://
+        return None
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
     parsed = urlparse(database_url)
@@ -40,7 +46,10 @@ def get_connection_params():
 @contextmanager
 def get_db():
     """Yield a database connection, commit on success, rollback on error."""
-    conn = psycopg2.connect(**get_connection_params())
+    params = get_connection_params()
+    if params is None:
+        raise RuntimeError('DATABASE_URL not set')
+    conn = psycopg2.connect(**params)
     try:
         yield conn
         conn.commit()
@@ -52,14 +61,28 @@ def get_db():
 
 
 def init_db():
-    """Create the scholar_results table if it does not exist."""
-    with get_db() as conn:
-        with conn.cursor() as cur:
-            cur.execute(INIT_SQL)
+    """Create the scholar_results table if it does not exist. Sets _db_available flag."""
+    global _db_available
+    params = get_connection_params()
+    if params is None:
+        print('[db] DATABASE_URL not set — scholar persistence disabled')
+        _db_available = False
+        return
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(INIT_SQL)
+        _db_available = True
+        print('[db] Connected to Postgres — scholar persistence enabled')
+    except Exception as e:
+        _db_available = False
+        print(f'[db] Could not connect to Postgres: {e} — scholar persistence disabled')
 
 
 def upsert_scholar_result(author_id, name, institution, data):
-    """Insert or update a single scholar result."""
+    """Insert or update a single scholar result. No-op if DB not available."""
+    if not _db_available:
+        return
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -78,7 +101,9 @@ def upsert_scholar_result(author_id, name, institution, data):
 
 
 def load_all_scholar_results():
-    """Return all scholar results as a list of dicts."""
+    """Return all scholar results as a list of dicts. Empty list if DB not available."""
+    if not _db_available:
+        return []
     with get_db() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute('SELECT author_id, name, institution, data, created_at, updated_at FROM scholar_results ORDER BY updated_at DESC')
@@ -97,6 +122,8 @@ def load_all_scholar_results():
 
 def delete_scholar_result(author_id):
     """Delete a single scholar result by author_id."""
+    if not _db_available:
+        return False
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute('DELETE FROM scholar_results WHERE author_id = %s', (author_id,))
@@ -105,6 +132,8 @@ def delete_scholar_result(author_id):
 
 def count_scholar_results():
     """Return the number of scholar results in the database."""
+    if not _db_available:
+        return 0
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute('SELECT COUNT(*) FROM scholar_results')
