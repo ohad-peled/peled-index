@@ -88,7 +88,13 @@ def search_scholar_by_name(serpapi_key, author_name):
 		'api_key': serpapi_key,
 	}
 	response = requests.get(SERPAPI_URL, params=params, timeout=60)
-	response.raise_for_status()
+	if not response.ok:
+		try:
+			error_data = response.json()
+			error_msg = error_data.get('error', response.text)
+		except Exception:
+			error_msg = response.text
+		raise RuntimeError('SerpAPI error: ' + str(error_msg))
 	data = response.json()
 	candidates = []
 	for author in data.get('profiles', []):
