@@ -62,7 +62,7 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
     """
     # Apply log1p transformation to reduce outlier noise
     scores_transformed = apply_log1p_transform(scores)
-    candidate_transformed = np.log1p(candidate_score)
+    candidate_transformed = np.log1p(candidate_score) if candidate_score is not None else None
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -104,7 +104,7 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
         annotation_text = f'Your rank: {percentile}{ordinal} percentile'
 
         # Position text left or right depending on space
-        x_range = max(scores_transformed) - min(scores_transformed) if scores_transformed.size else 1
+        x_range = max(scores_transformed) - min(scores_transformed) if scores_transformed.size > 0 else 1
         text_x_offset = x_range * 0.02
         ha = 'left'
         if percentile > 80:
