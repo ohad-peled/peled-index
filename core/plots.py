@@ -35,9 +35,16 @@ def extract_author_scores(results):
     return [entry['author_score'] for entry in results]
 
 
+def apply_log1p_transform(scores):
+    """Apply log1p transformation to scores to reduce outlier noise."""
+    return np.log1p(np.array(scores))
+
+
 def compute_percentile(scores, candidate_score):
-    """Compute the percentile of a candidate score within the distribution."""
-    return round(np.mean(np.array(scores) < candidate_score) * 100, 1)
+    """Compute the percentile of a candidate score within the distribution using log1p transformation."""
+    scores_transformed = apply_log1p_transform(scores)
+    candidate_transformed = np.log1p(candidate_score)
+    return round(np.mean(scores_transformed < candidate_transformed) * 100, 1)
 
 
 def _ordinal_suffix(percentile):
@@ -50,9 +57,13 @@ def _ordinal_suffix(percentile):
 
 def plot_score_distribution_for_field(scores, candidate_score, candidate_name, percentile, field):
     """
-    Generate a styled author score histogram as a Base64 PNG image.
+    Generate a styled author score histogram as a Base64 PNG image using log1p-transformed scores.
     Returns the plot as a Base64-encoded string instead of displaying it.
     """
+    # Apply log1p transformation to reduce outlier noise
+    scores_transformed = apply_log1p_transform(scores)
+    candidate_transformed = np.log1p(candidate_score)
+
     fig, ax = plt.subplots(figsize=(12, 6))
 
     # Background
@@ -61,7 +72,7 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
 
     # Histogram
     n, bins, patches = ax.hist(
-        scores,
+        scores_transformed,
         bins=60,
         color='#4a90d9',
         edgecolor='#0f1117',
@@ -71,17 +82,17 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
     )
 
     # Gradient-style coloring: bins to the left of candidate darker
-    if candidate_score is not None:
+    if candidate_transformed is not None:
         for patch, left_edge in zip(patches, bins[:-1]):
-            if left_edge < candidate_score:
+            if left_edge < candidate_transformed:
                 patch.set_facecolor('#be915c')
             else:
                 patch.set_facecolor('#eeb674')
 
     # Candidate vertical line
-    if candidate_score is not None:
+    if candidate_transformed is not None:
         ax.axvline(
-            candidate_score,
+            candidate_transformed,
             color='#ee7974',
             linewidth=2,
             linestyle='--',
@@ -93,7 +104,7 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
         annotation_text = f'Your rank: {percentile}{ordinal} percentile'
 
         # Position text left or right depending on space
-        x_range = max(scores) - min(scores) if scores else 1
+        x_range = max(scores_transformed) - min(scores_transformed) if scores_transformed.size else 1
         text_x_offset = x_range * 0.02
         ha = 'left'
         if percentile > 80:
@@ -101,7 +112,7 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
             ha = 'right'
 
         ax.text(
-            candidate_score + text_x_offset,
+            candidate_transformed + text_x_offset,
             ax.get_ylim()[1] * 0.92,
             annotation_text,
             color='#ee7974',
@@ -119,7 +130,7 @@ def plot_score_distribution_for_field(scores, candidate_score, candidate_name, p
         )
 
     # Axis labels and title
-    ax.set_xlabel('Author Score', color='#cccccc', fontsize=20, labelpad=10)
+    ax.set_xlabel('Author Score (log1p)', color='#cccccc', fontsize=20, labelpad=10)
     ax.set_ylabel('Number of Authors', color='#cccccc', fontsize=20, labelpad=10)
     ax.set_title(
         f'{candidate_name}',
