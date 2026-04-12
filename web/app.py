@@ -12,7 +12,7 @@ from core.helpers import load_scimago_data_by_issn
 from web.api.routes import router
 from web.utils import make_author_id
 
-RESULTS_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'phd_2010-2025_isr_res.json')
+RESULTS_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'phd_isr_res_filtered.json')
 SCIMAGO_CSV_PATH = os.path.join(os.path.dirname(__file__), '..', 'scimagojr2024.csv')
 STATIC_DIR = os.path.join(os.path.dirname(__file__), 'static')
 
