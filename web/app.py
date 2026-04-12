@@ -49,4 +49,14 @@ app.add_middleware(
 
 app.include_router(router, prefix='/api')
 
+
+@app.get('/api/startup-info')
+def startup_info():
+    """Return the filenames of the data sources used by this app."""
+    return {
+        'results_json': os.path.basename(RESULTS_JSON_PATH),
+        'scimago_csv': os.path.basename(SCIMAGO_CSV_PATH),
+    }
+
+
 app.mount('/', StaticFiles(directory=STATIC_DIR, html=True), name='static')
