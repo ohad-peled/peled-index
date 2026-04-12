@@ -28,7 +28,6 @@ def _build_index(results: List[dict]) -> Dict[str, dict]:
     return index
 
 @asynccontextmanager
-@asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize app state with data files."""
     logger.info(f"Loading data from: {RESULTS_JSON_PATH}")
