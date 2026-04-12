@@ -40,25 +40,40 @@ PROJECT SUMMARY (peled-index)
 =============================
 
 Purpose:
-Peled Index is an author-level academic scoring system. It takes a list of researchers (with their publication titles and PhD start years), enriches each paper via the Crossref API and SCImago journal data, computes a per-author score normalized by career length, and serves the results through a web UI where users can search authors and view percentile-rank plots within scientific fields.
+Peled Index is an author-level academic scoring system. It takes a list of researchers (with their publication titles and PhD start years), enriches each paper via the Crossref API and SCImago journal data, computes a per-author score normalized by career length, and serves the results through a web UI where users can search authors and view percentile-rank plots within scientific fields. Users can also search and scrape Google Scholar profiles on demand to score authors not in the precomputed dataset.
+
+Deployment:
+The app is deployed on Railway (peled-index-production.up.railway.app). The Procfile runs uvicorn on web.app:app. Railway environment variables: SERPAPI_KEY, ADMIN_KEY, DATABASE_URL (from Railway Postgres addon).
 
 Architecture:
-The project has three layers: core (scoring pipeline), web (FastAPI serving layer), and data (pre-computed results JSON + SCImago CSV). There are also root-level duplicates of the core files (pipeline.py, helpers.py, main.py, plots.py) which are identical to those under core/ — the root copies are legacy and the web layer imports from core/.
+The project has four layers:
+  1. core/ — scoring pipeline and helpers (offline batch processing + on-demand Scholar scoring)
+  2. web/ — FastAPI serving layer with API routes, handlers, database persistence, and static frontend
+  3. data/ — precomputed results JSON files + SCImago CSV (read-only at runtime)
+  4. local/ — legacy duplicates of core files + an upload utility script
+
+Data loading:
+  - On startup (lifespan in web/app.py), the app calls init_db() to connect to Postgres (graceful no-op if DATABASE_URL is not set), then calls load_results_into_state(app) which reads the precomputed JSON from disk AND scholar results from Postgres, merges them (scholar entries override on collision), and stores the merged list in app.state.results and app.state.index.
+  - Scholar scrapes are persisted to Postgres via upsert_scholar_result() in web/db.py. This survives restarts, redeployments, and is shared across all dynos/instances.
+  - An admin reload endpoint (POST /api/admin/reload, protected by ADMIN_KEY header) re-reads both data sources into memory without restarting the app.
+  - An admin scholar-results endpoint (GET /api/admin/scholar-results) returns all scholar-scraped entries from the database.
+  - The precomputed JSON file (data/phd_isr_res_filtered.json) is deployed as part of the git repo. To update it: replace the file, push, and optionally hit the reload endpoint.
 
 File-by-file breakdown:
 
-  core/helpers.py (~12 KB)
+  core/helpers.py (~14 KB)
     The low-level workhorse module. Responsibilities:
     - Crossref API interaction: fetches candidate records for a title+author query, with retry/backoff on 429s. Uses a persistent requests.Session.
-    - Text normalization: heavy normalization pipeline (ftfy, html unescape, unicode NFKD, ASCII folding, lowercasing, punctuation removal) used for title and author name matching.
+    - Text normalization: heavy normalization pipeline (ftfy, html unescape, unicode NFKD, ASCII folding, lowercasing, punctuation removal) used for title and author name matching. Title matching uses SequenceMatcher with a 0.9 threshold.
     - ISSN normalization and SCImago CSV parsing: loads scimagojr2024.csv (semicolon-delimited) into two dicts keyed by normalized ISSN — one for SJR values, one for mapped high-level fields.
     - SCImago area-to-field mapping: a hardcoded dict (SCIMAGO_AREA_TO_FIELD) that collapses ~25 SCImago subject areas into 4 broad fields: Life Sciences, Physics and Chemistry, Computer Science and Engineering, Social Sciences and Humanities.
     - Crossref record extraction: functions to extract title, ISSNs, year, venue, citations, first author name, preprint detection (by type/subtype + platform name matching against biorxiv/medrxiv/chemrxiv/arxiv).
-    - Match selection logic (find_crossref_match): for a given title, iterates Crossref hits, requires exact normalized title match + author name match + DOI present, prefers journal-article type, falls back to first non-article match.
+    - Match selection logic (find_crossref_match): for a given title, tries top-1 hit first, then next 3. Requires title similarity >= 0.9 + author name match + DOI present. Prefers journal-article type, falls back to first non-article match.
     - Paper deduplication by title.
     - JSON I/O for author list input and results output.
+    - Field ranking: rank_fields_by_paper_count returns fields sorted by paper count descending.
 
-  core/pipeline.py (~4 KB)
+  core/pipeline.py (~5.7 KB)
     Orchestration and scoring logic. Responsibilities:
     - build_papers_from_titles: for one author, fetches all papers concurrently (ThreadPoolExecutor, 8 workers) via find_crossref_match, enriches each with SJR and field data.
     - Parsing helpers: parse_year, parse_int, parse_float — safe converters returning None or 0 on failure.
@@ -68,55 +83,103 @@ File-by-file breakdown:
         * authorship_weight = 1.0 if first author, else 0.1 (non_first_author_weight).
         * If journal SJR available: score = authorship_weight * (0.3 * citations_per_year + 0.7 * journal_sjr).
         * If no SJR: score = authorship_weight * citations_per_year.
-    - compute_author_score: sums paper scores, divides by active_years (current_year - start_year + 1). Returns 0.0 if no valid papers or non-positive active years.
-      KNOWN ISSUE: if start_year is None (unparseable), active_years computation crashes (None arithmetic). This is a planned refactor target — adding an infer_start_year boolean flag to run_pipeline that, when True, infers start_year from the earliest publication year for ALL authors consistently, ignoring the input start_year field entirely.
-    - score_author: ties together paper building, scoring, and field aggregation for one author. Pops journal_issns from paper dicts during field extraction (side effect).
-    - run_pipeline: top-level entry point. Loads SCImago data, iterates authors sequentially (prints progress), scores each, saves results JSON.
+    - infer_start_year_from_papers: infers career start from the earliest publication year (used for Scholar-scraped authors who have no input start_year).
+    - compute_author_score: sums paper scores, divides by active_years (current_year - start_year + 1). Returns 0.0 if no valid papers or non-positive active years or start_year is None.
+    - compute_compressed_author_score: applies log1p compression to reduce tail influence.
+    - score_author: ties together paper building, scoring, and field aggregation for one author from the input JSON (uses input start_year).
+    - score_author_from_scholar: same flow but for Scholar-scraped authors — infers start_year from earliest paper, since Scholar profiles do not provide PhD start year.
+    - run_pipeline: top-level entry point for batch processing. Loads SCImago data, iterates authors sequentially, scores each, saves results JSON.
 
-  core/plots.py (~5.8 KB)
+  core/plots.py (~6.4 KB)
     Visualization module. Generates per-field score distribution histograms as Base64-encoded PNG images (matplotlib). Key functions:
     - filter_eligible_authors_by_field: filters to authors with score > 0 and matching field.
-    - compute_percentile: fraction of scores below the candidate.
+    - extract_author_scores: extracts score values from a results list.
+    - apply_log1p_transform: applies log1p to reduce outlier noise in plots.
+    - compute_percentile: fraction of log1p-transformed scores below the candidate.
     - plot_score_distribution_for_field: dark-themed histogram, dual-tone bins (darker left of candidate), dashed red candidate line with percentile annotation. Returns Base64 string.
-    - generate_plots_for_author: orchestrates plot generation for all fields of a given author.
+    - generate_plots_for_author: orchestrates plot generation for all fields of a given author (used by CLI, not by web layer).
+
+  core/scholar.py (~3.1 KB)
+    Google Scholar integration via SerpAPI. Responsibilities:
+    - fetch_scholar_page: fetches one page of articles from a Scholar author profile (100 per page).
+    - extract_scholar_author_name, extract_scholar_institution, extract_scholar_paper_titles: parse SerpAPI response fields.
+    - has_next_page: checks SerpAPI pagination for more pages.
+    - deduplicate_titles: deduplicates by normalized title.
+    - fetch_all_scholar_papers: paginates through all pages, returns (author_name, institution, deduplicated_titles).
+    - search_scholar_by_name: searches Google Scholar for author name candidates, returns list of {author_id, name, affiliations, email, cited_by}.
 
   core/main.py (~2.9 KB)
-    CLI entrypoint. Currently hardcoded to local Windows paths. Calls run_pipeline. Contains commented-out utility functions (zero-publication summary, single-author test).
+    CLI entrypoint for batch pipeline runs. Currently hardcoded to local Windows paths. Calls run_pipeline. Contains commented-out utility functions.
 
-  web/app.py (~1.3 KB)
-    FastAPI application. On startup (lifespan), loads the pre-computed results JSON (data/phd_2010-2025_isr_res.json) into memory and builds an index dict keyed by author ID. Mounts static files and API router.
+  web/app.py (~3.7 KB)
+    FastAPI application setup and admin endpoints. Responsibilities:
+    - Data loading functions: _build_index (creates MD5-keyed lookup dict), _load_json_file (reads JSON from disk), _merge_results (merges precomputed + scholar, scholar overrides on collision), load_results_into_state (loads both sources into app.state).
+    - Lifespan: calls init_db(), load_results_into_state(), loads SCImago data, sets current_year and serpapi_key on app.state.
+    - GET /api/startup-info: returns filenames, precomputed count, scholar DB count, total loaded count.
+    - POST /api/admin/reload: re-reads all data into app.state (protected by ADMIN_KEY header).
+    - GET /api/admin/scholar-results: returns all scholar entries from Postgres (protected by ADMIN_KEY header).
+    - Mounts static files for the frontend.
+
+  web/db.py (~4.4 KB)
+    Postgres persistence layer for scholar results. Gracefully degrades if DATABASE_URL is not set (all functions become no-ops, app still works with precomputed data only). Responsibilities:
+    - Connection management: parses DATABASE_URL, handles postgres:// vs postgresql:// prefix, context manager for connections with commit/rollback.
+    - init_db: creates scholar_results table if not exists, sets _db_available flag. Prints status to stdout.
+    - upsert_scholar_result: inserts or updates one author entry (JSONB data column). No-op if DB unavailable.
+    - load_all_scholar_results: returns all rows as dicts with _db_meta (author_id, created_at, updated_at). Empty list if DB unavailable.
+    - delete_scholar_result, count_scholar_results: utility functions.
+    - Table schema: scholar_results (author_id TEXT PK, name TEXT, institution TEXT, data JSONB, created_at TIMESTAMP, updated_at TIMESTAMP).
 
   web/utils.py (~0.2 KB)
     Single utility: make_author_id — MD5 hash of "name_institution" string.
 
-  web/api/routes.py (~1.2 KB)
-    Three FastAPI endpoints under /api/authors/:
-    - GET /search?query=... — substring search by name.
-    - GET /{author_id} — full author detail.
-    - GET /{author_id}/plot/{field} — generates and returns a Base64 plot.
+  web/api/routes.py (~2.5 KB)
+    Five FastAPI endpoints under /api/authors/:
+    - GET /scholar/search?name=... — searches Google Scholar for author profile candidates by name.
+    - GET /search?query=... — substring search by name in the in-memory index.
+    - POST /scholar — scrapes a Google Scholar profile by scholar_id, scores the author, persists to DB, returns the entry.
+    - GET /{author_id} — full author detail from the in-memory index.
+    - GET /{author_id}/plot?field=... — generates and returns a Base64 plot for the author in a specific field.
 
-  web/api/handlers.py (~2.5 KB)
-    Business logic behind routes. search_authors returns summary dicts. get_author returns full entry. generate_plot calls into core/plots.py functions to produce the histogram.
+  web/api/handlers.py (~3.4 KB)
+    Business logic behind routes. Responsibilities:
+    - search_scholar_profiles: delegates to core/scholar.search_scholar_by_name.
+    - search_authors: filters in-memory index by name substring, returns summary dicts.
+    - get_author: returns full entry from index.
+    - scrape_and_score_scholar_author: calls fetch_all_scholar_papers, checks for existing entry, calls score_author_from_scholar, appends to in-memory state, persists to Postgres via upsert_scholar_result.
+    - generate_plot: calls into core/plots functions to produce the histogram for one author in one field.
 
-  web/static/index.html + app.js (~13 KB combined)
-    Single-page frontend. Dark-themed UI ("Ranki" / "Peled Index"). Features:
+  web/static/index.html (~11.2 KB)
+    Single-page frontend HTML. Dark-themed UI ("Ranki" / "Score your influence!"). Contains all CSS inline. Structure: search input with dropdown, author card, plots section, papers section, footer with GitHub/LinkedIn links.
+
+  web/static/app.js (~18.4 KB)
+    Frontend JavaScript (vanilla, no frameworks). Features:
     - Live search with debounced dropdown (250ms), shows author name + institution + score + paper count.
-    - On author selection: renders a card (name, institution, score, papers, field tags) and fetches/renders a plot for each field.
-    - Vanilla JS, no frameworks. Variable names are underscore-delimited per style guide, function names camelCase.
+    - If no results found: renders a Scholar prompt with two paths — search by name (calls /scholar/search, shows candidates) or enter Scholar ID directly.
+    - On author selection: renders a card (name, institution, score, papers) and fetches/renders a plot for the default field.
+    - Field switcher: "Not your field?" toggle reveals all 4 fields as clickable tags to regenerate the plot.
+    - Paper cards grid: renders all papers with title (linked if DOI available), venue, citations, year, first-author badge.
+    - Variable names are underscore-delimited per style guide, function names camelCase.
+
+  local/upload.py (~0.8 KB)
+    CLI utility for updating the precomputed JSON and triggering a reload. Takes a file path and app URL as arguments, copies the file to disk, then calls POST /api/admin/reload with ADMIN_KEY from env.
+
+  local/helpers.py, local/main.py, local/pipeline.py, local/plots.py
+    Legacy duplicates of core/ files. The web layer imports from core/, not local/. These exist for historical reasons and are not used by the deployed app.
+
+  data/phd_isr_res_filtered.json (~51.8 MB)
+    Primary precomputed pipeline output. JSON array of scored author entries. Loaded by the web layer at startup.
 
   data/phd_2010-2025_isr_res.json (~14.7 MB)
-    Pre-computed pipeline output. Large JSON array of scored author entries, used by the web layer at startup.
+    Older/smaller precomputed results file. Not used by the deployed app (app loads phd_isr_res_filtered.json).
 
   scimagojr2024.csv (~10.7 MB)
-    SCImago Journal Rank 2024 dataset. Semicolon-delimited. Key columns used: Issn, SJR, Areas.
+    SCImago Journal Rank 2024 dataset. Semicolon-delimited. Key columns used: Issn, SJR, Areas. Loaded at startup into two in-memory dicts.
 
 Data flow:
-  1. Input JSON (array of {name, start_year, institution, publications}) is loaded.
-  2. For each author, each publication title is queried against Crossref (concurrently, 8 threads).
-  3. Best Crossref match is selected (exact title + author name match, prefers journal-article).
-  4. Paper metadata is enriched with SJR and fields via ISSN lookup against SCImago data.
-  5. Paper scores are computed, summed, and normalized by career length to produce author_score.
-  6. Results JSON is saved. The web layer loads this JSON and serves it via API + static frontend.
+  1. BATCH (offline): Input JSON (array of {name, start_year, institution, publications}) -> Crossref enrichment (concurrent, 8 threads per author) -> SCImago SJR/field lookup -> paper scoring -> author scoring -> results JSON saved to data/.
+  2. ON-DEMAND (live): User searches Scholar -> selects profile -> SerpAPI fetches all paper titles -> same Crossref+SCImago enrichment and scoring as batch -> result added to in-memory state AND persisted to Postgres.
+  3. STARTUP: Precomputed JSON loaded from disk + scholar results loaded from Postgres -> merged (scholar overrides) -> stored in app.state.results and app.state.index.
+  4. ADMIN RELOAD: POST /api/admin/reload re-executes step 3 without restart.
 
 Scoring formula summary:
   paper_score = authorship_weight * (0.3 * (citations / paper_age) + 0.7 * journal_sjr)
@@ -126,16 +189,20 @@ Scoring formula summary:
     - Preprints and papers with missing/future years are excluded.
   author_score = sum(paper_scores) / active_years
     - active_years = current_year - start_year + 1.
+    - For Scholar-scraped authors: start_year is inferred from earliest publication year.
+  author_score_log1p = log1p(author_score) — compressed version for reduced tail influence.
 
 Key design decisions:
   - Functional programming paradigm. No classes. Stateless functions. Minimal mutability.
-  - Microservice-style module separation: helpers is the extensive low-level interface, pipeline is orchestration, plots is visualization, web is serving.
-  - Crossref matching is strict: requires exact normalized title match AND author name match AND DOI.
+  - Microservice-style module separation: helpers is the extensive low-level interface, pipeline is orchestration, plots is visualization, scholar is Google Scholar integration, web is serving, db is persistence.
+  - Crossref matching is strict: requires title similarity >= 0.9 AND author name match AND DOI present.
   - SCImago areas are collapsed into 4 broad fields for cross-discipline comparison.
-  - The web layer is read-only — it serves pre-computed results. Pipeline runs are offline/batch.
-  - Root-level files (pipeline.py, helpers.py, main.py, plots.py) are legacy duplicates of core/. The web layer imports from core/.
+  - The web layer serves precomputed results merged with on-demand Scholar results. Pipeline runs are offline/batch.
+  - Scholar results are persisted to Postgres so they survive restarts and are shared across all instances.
+  - The database layer degrades gracefully: if DATABASE_URL is not set, the app works with precomputed data only, and Scholar scrapes are in-memory only.
+  - Root-level files do not exist. Legacy duplicates live under local/. The web layer imports from core/.
 
-output format:
+Output format:
 [
   {
     "name": <string>,
@@ -144,12 +211,7 @@ output format:
     "author_score": <float>,
     "author_score_log1p": <float>,
     "total_papers": <int>,
-    "fields": [
-      {
-        "field": <string>,
-        "count": <int>
-      }
-    ],
+    "fields": [<string>, ...],
     "papers": [
       {
         "title": <string>,
@@ -164,3 +226,8 @@ output format:
     ]
   }
 ]
+
+Environment variables:
+  - SERPAPI_KEY: API key for SerpAPI (Google Scholar access). Required for Scholar search/scrape features.
+  - ADMIN_KEY: Shared secret for admin endpoints (reload, scholar-results). Required for admin access.
+  - DATABASE_URL: Postgres connection string (set automatically by Railway Postgres addon). Optional — app works without it but Scholar results are not persisted.
