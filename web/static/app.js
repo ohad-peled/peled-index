@@ -168,8 +168,7 @@ function runScholarNameSearch(author_name) {
 			if (!res.ok) {
 				return res.json().then(function (body) {
 					throw new Error(body.detail || 'Search failed (' + res.status + ')');
-				}).catch(function (err) {
-					if (err.message) throw err;
+				}).catch(function (parse_error) {
 					throw new Error('Search failed (' + res.status + ')');
 				});
 			}

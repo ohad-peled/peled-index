@@ -19,10 +19,14 @@ def scholar_search(request: Request, name: str = Query(..., min_length=1)):
 	state = request.app.state
 	if not state.serpapi_key:
 		raise HTTPException(status_code=500, detail='SERPAPI_KEY not configured')
-	candidates = search_scholar_profiles(name, state.serpapi_key)
+	try:
+		candidates = search_scholar_profiles(name, state.serpapi_key)
+	except Exception as exc:
+		raise HTTPException(status_code=502, detail=str(exc))
 	if not candidates:
 		raise HTTPException(status_code=404, detail='No Scholar profiles found for this name')
 	return candidates
+
 
 @router.get('/search')
 def search(request: Request, query: str = Query(..., min_length=1)):
