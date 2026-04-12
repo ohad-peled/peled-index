@@ -81,23 +81,17 @@ def fetch_all_scholar_papers(serpapi_key, scholar_id):
 	return author_name, institution, deduplicate_titles(all_titles)
 
 def search_scholar_by_name(serpapi_key, author_name):
-	'''Search Google Scholar for author name candidates.
-	Uses the profiles key returned by the google_scholar engine,
-	which contains full names, author_ids, and affiliations.
-	'''
+	'Search Google Scholar for author profile candidates by name.'
 	params = {
-		'engine': 'google_scholar',
-		'q': 'author:"' + author_name + '"',
+		'engine': 'google_scholar_profiles',
+		'mauthors': author_name,
 		'api_key': serpapi_key,
-		'num': 20,
 	}
 	response = requests.get(SERPAPI_URL, params=params, timeout=60)
 	response.raise_for_status()
 	data = response.json()
-
-	authors = data.get('profiles', {}).get('authors', [])
 	candidates = []
-	for author in authors:
+	for author in data.get('profiles', []):
 		author_id = author.get('author_id')
 		if not author_id:
 			continue
