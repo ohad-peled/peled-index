@@ -271,6 +271,63 @@
       display: flex;
     }
 
+    .card-not-you-section {
+      margin-top: 1rem;
+    }
+
+    .card-not-you-toggle {
+      color: #7a7d9a;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+
+    .card-not-you-toggle:hover {
+      color: var(--accent-color);
+    }
+
+    #author-scholar-id-section {
+      display: none;
+      margin-top: 0.5rem;
+    }
+
+    #author-scholar-id-section.visible {
+      display: block;
+    }
+
+    .author-scholar-id-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    #author-scholar-id-input {
+      flex: 1;
+      padding: 0.5rem 0.7rem;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 0.9rem;
+      outline: none;
+    }
+
+    #author-scholar-go-btn {
+      padding: 0.5rem 1rem;
+      background: #0096ff;
+      border: none;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #author-scholar-status {
+      margin-top: 0.4rem;
+      font-size: 0.82rem;
+      color: #94a3b8;
+    }
+
 
     /* ── Scrollbar ── */
     ::-webkit-scrollbar { width: 6px; }
