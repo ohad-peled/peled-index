@@ -251,7 +251,8 @@ function renderScholarCandidates(candidates, container) {
 
 function runScholarScrape(scholar_id) {
 	var status_element = document.getElementById('scholar-search-status') ||
-		document.getElementById('scholar-scrape-status');
+		document.getElementById('scholar-scrape-status') ||
+		document.getElementById('author-scholar-status');
 
 	if (status_element) {
 		status_element.textContent = 'Scraping Scholar profile…';
@@ -404,9 +405,48 @@ function runScholarScrape(scholar_id) {
           '<span class="stat-label">Total Papers</span>' +
           '<span class="stat-value">' + escapeHtml(author.total_papers || 0) + '</span>' +
         '</div>' +
+      '</div>' +
+      '<div class="card-not-you-section">' +
+        '<span class="card-not-you-toggle">Not you?</span>' +
+        '<div id="author-scholar-id-section">' +
+          '<div class="author-scholar-id-row">' +
+            '<input id="author-scholar-id-input" type="text" placeholder="e.g. nFTM_YIAAAAJ" />' +
+            '<button id="author-scholar-go-btn">Go</button>' +
+          '</div>' +
+          '<div id="author-scholar-status"></div>' +
+        '</div>' +
       '</div>';
 
     authorCard.classList.add('visible');
+    attachCardNotYouListeners();
+  }
+
+  function attachCardNotYouListeners() {
+    var card_toggle = authorInfo.querySelector('.card-not-you-toggle');
+    var scholar_id_section = document.getElementById('author-scholar-id-section');
+    var scholar_id_input = document.getElementById('author-scholar-id-input');
+    var scholar_go_button = document.getElementById('author-scholar-go-btn');
+
+    if (!card_toggle || !scholar_id_section || !scholar_id_input || !scholar_go_button) return;
+
+    card_toggle.addEventListener('click', function () {
+      scholar_id_section.classList.toggle('visible');
+      if (scholar_id_section.classList.contains('visible')) scholar_id_input.focus();
+    });
+
+    scholar_go_button.addEventListener('click', function () {
+      runCardScholarScrape(scholar_id_input.value.trim());
+    });
+
+    scholar_id_input.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter') return;
+      runCardScholarScrape(scholar_id_input.value.trim());
+    });
+  }
+
+  function runCardScholarScrape(scholar_id) {
+    if (!scholar_id) return;
+    runScholarScrape(scholar_id);
   }
 
 
