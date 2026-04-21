@@ -60,6 +60,13 @@ def _fetch_crossref_rows(title, author_name, rows):
 		if response.status_code == 429:
 			time.sleep(2 ** attempt)
 			continue
+		if response.status_code >= 500:
+			print(
+				f'Crossref returned {response.status_code} for title="{title}" '
+				f'author="{author_name}"'
+			)
+			time.sleep(2 ** attempt)
+			continue
 		response.raise_for_status()
 		return response.json()['message']['items']
 	return []
