@@ -126,6 +126,8 @@ def score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, curr
 	else:
 		start_year = parse_year(author_entry.get('start_year'))
 	papers = build_papers_from_titles(author_entry['publications'], author_name, scimago_sjr_by_issn, scimago_fields_by_issn)
+	if infer_start_year:
+		start_year = infer_start_year_from_papers(papers)
 	author_score = compute_author_score(papers, current_year, start_year, infer_start_year)
 	compressed_author_score = compute_compressed_author_score(author_score)
 	author_fields = rank_fields_by_paper_count(papers, scimago_fields_by_issn)
