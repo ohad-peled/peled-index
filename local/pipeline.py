@@ -121,10 +121,7 @@ def compute_compressed_author_score(author_score):
 def score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, current_year, infer_start_year):
 	'Build and score one author entry from the input JSON.'
 	author_name = author_entry['name']
-	if infer_start_year:
-		start_year = None
-	else:
-		start_year = parse_year(author_entry.get('start_year'))
+	start_year = parse_year(author_entry.get('start_year'))
 	papers = build_papers_from_titles(author_entry['publications'], author_name, scimago_sjr_by_issn, scimago_fields_by_issn)
 	if infer_start_year:
 		start_year = infer_start_year_from_papers(papers)
