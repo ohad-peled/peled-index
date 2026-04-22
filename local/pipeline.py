@@ -152,4 +152,3 @@ def run_pipeline(input_json_path, output_json_path, scimago_file_path, infer_sta
 		print(f'Processing author {author_index}: {author_entry["name"]}')
 		results.append(score_author(author_entry, scimago_sjr_by_issn, scimago_fields_by_issn, current_year, infer_start_year))
 	save_results_json(output_json_path, results)
-	return results
