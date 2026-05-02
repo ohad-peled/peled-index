@@ -1,100 +1,23 @@
-# peled-index
+# Ranki
 
-Compute an author-level research score from a JSON list of authors and publication titles by enriching metadata via Crossref and journal SJR/fields via SCImago (SJR 2024 dataset in this repo).
+Author-level research impact scoring. Search by name, see where you rank among your peers.
 
-## What it does
+## Why Ranki?
+Academic impact is hard to measure fairly. Counting citations rewards popularity but ignores where those citations come from. Counting papers rewards prolixity. Ranki tries to balance both—penalizing venue shopping while acknowledging that research matures over time. Ranki scores academic researchers based on publication quality and citation impact, normalized for career stage. You provide a name—the system enriches it with metadata, cross-references journal rankings, and tells you how you compare within your field. The underlying assumption is simple: impact compounds over time. A paper in a top-tier journal with 100 citations matters more than 10 papers in low-impact venues. But a researcher with 5 papers should not be compared directly to one with 50. We normalize by career years to level the playing field.
 
-For each author in an input JSON file, the pipeline:
-- queries Crossref for each publication title (+ author name) and selects a best match
-- extracts: DOI URL, year, venue, citation count, journal ISSNs, first-author flag, preprint flag
-- looks up SCImago SJR and mapped high-level fields by ISSN (from `scimagojr2024.csv`)
-- computes an `author_score` from citations/year and journal SJR, normalized by active years
-- writes a results JSON file with per-author details and per-paper enrichment
+## How is Ranki computed?
 
-There is also a plotting script to visualize where a candidate ranks (percentile) within their fields.
+For each paper, we calculate:
+paper_score = author_weight × (0.3 × citation_intensity + 0.7 × journal_prestige)
+**Author weight** is 1.0 if you're first author, 0.1 if you're a co-author. This reflects that first-author papers represent more direct contribution.
 
-## Repo layout
+**Citation intensity** is citations divided by paper age. A 2-year-old paper with 20 citations is more impressive than a 10-year-old paper with 20 citations.
 
-- `main.py` - example entrypoint that runs the pipeline
-- `pipeline.py` - orchestration + scoring logic
-- `helpers.py` - Crossref + SCImago parsing and matching helpers
-- `plots.py` - percentile + histogram plots from the produced results JSON
-- `scimagojr2024.csv` - SCImago Journal Rank dataset (semicolon-delimited)
-- `intent.txt` - coding/style guidelines for future changes
+**Journal prestige** is the SCImago Journal Rank (SJR), a measure of journal impact normalized across fields. We weight it at 0.7 because venue choice matters—publishing in *Nature* versus a niche conference is not random.
 
-## Input format (JSON)
+The **author score** is the sum of all valid paper scores, divided by your career length. This normalization ensures early-career researchers aren't penalized for fewer papers.
 
-The pipeline expects a JSON array of author objects. Minimum fields used:
-- `name` (string)
-- `start_year` (number/string parseable to int)
-- `publications` (array of strings; paper titles)
+Finally, we apply log₁p compression to reduce the influence of outliers.
 
-Optional:
-- `institution` (string)
+For more details, feel free to reach out ohad.peled@mail.huji.ac.il
 
-Example:
-```json
-[
-  {
-    "name": "Ada Lovelace",
-    "institution": "Example University",
-    "start_year": 2018,
-    "publications": [
-      "A Paper Title",
-      "Another Paper Title"
-    ]
-  }
-]
-```
-
-## Output format (JSON)
-
-The output is a JSON array, one entry per author, with:
-- `author_score`
-- `total_papers`
-- `fields` (mapped high-level fields)
-- `papers` (enriched paper records: year, citations, doi url, SJR, flags, etc.)
-
-## How to run
-
-### 1) Install dependencies
-
-This repo currently does not include a `requirements.txt`. Based on imports, you likely need:
-- `requests`
-- `ftfy`
-- (for plotting) `numpy`, `matplotlib`
-
-Install (example):
-```bash
-python -m pip install requests ftfy numpy matplotlib
-```
-
-### 2) Run the pipeline
-
-`main.py` is currently hard-coded to local Windows paths. Update these three paths before running:
-- `input_json_path`
-- `output_json_path`
-- `scimago_file_path` (can point to `./scimagojr2024.csv`)
-
-Then:
-```bash
-python main.py
-```
-
-Alternatively, call the function directly:
-```python
-from pipeline import run_pipeline
-
-run_pipeline('input.json', 'out.json', 'scimagojr2024.csv')
-```
-
-### 3) Plot candidate percentile (optional)
-
-`plots.py` is also hard-coded (results path + candidate name). Update:
-- `RESULTS_JSON_PATH`
-- `CANDIDATE_NAME`
-
-Then:
-```bash
-python plots.py
-```
