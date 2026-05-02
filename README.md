@@ -10,7 +10,7 @@ You provide a name—the system enriches it with metadata, cross-references jour
 The ranking combines publication quality, citation impact, and career productivity into a single normalized score.
 All scores are field-specific.
 
-## Per-Paper Score
+## Per-paper score
 
 ```
 paper_score = author_weight × (0.3 × citation_intensity + 0.7 × journal_prestige)
@@ -20,7 +20,7 @@ paper_score = author_weight × (0.3 × citation_intensity + 0.7 × journal_prest
 - **citation_intensity**: citations ÷ paper age. A 2-year-old paper with 20 citations outranks a 10-year-old one.
 - **journal_prestige**: SCImago Journal Rank (SJR)—normalized journal impact across fields. Weighted at 0.7 because venue choice signals research quality.
 
-### Author Score
+### Author score
 
 ```
 author_score = sum(paper_scores) / active_years
@@ -30,7 +30,7 @@ author_score = sum(paper_scores) / active_years
 - Normalization ensures researchers are ranked fairly regardless of career length
 - Log₁p compression reduces influence of extreme outliers
 
-## Finding Your Ranking
+## Finding your Ranki
 
 To be found on Ranki, you need a **Google Scholar profile**. Without one, the system cannot locate your publication record.
 
